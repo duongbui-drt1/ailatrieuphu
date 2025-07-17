@@ -1,0 +1,167 @@
+[
+    {
+        "level": 1,
+        "question": "Đâu là châu lục lạnh nhất, khô nhất và cao nhất trên Trái Đất?",
+        "options": {
+            "A": "Châu Á",
+            "B": "Châu Nam Cực",
+            "C": "Châu Âu",
+            "D": "Bắc Mỹ"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 2,
+        "question": "Trong một năm không nhuận có bao nhiêu ngày?",
+        "options": {
+            "A": "364",
+            "B": "365",
+            "C": "366",
+            "D": "360"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 3,
+        "question": "Thủ đô của nước Nga là thành phố nào?",
+        "options": {
+            "A": "Saint Petersburg",
+            "B": "Kazan",
+            "C": "Sochi",
+            "D": "Moscow"
+        },
+        "answer": "D"
+    },
+    {
+        "level": 4,
+        "question": "Loài vật nào được mệnh danh là 'chúa sơn lâm' ở Việt Nam?",
+        "options": {
+            "A": "Sư tử",
+            "B": "Gấu",
+            "C": "Hổ",
+            "D": "Voi"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 5,
+        "question": "Tác phẩm 'Mona Lisa' của Leonardo da Vinci hiện đang được trưng bày tại bảo tàng nào?",
+        "options": {
+            "A": "Bảo tàng Anh",
+            "B": "Bảo tàng Prado",
+            "C": "Bảo tàng Louvre",
+            "D": "Bảo tàng Vatican"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 6,
+        "question": "Trong hóa học, nguyên tố nào có số hiệu nguyên tử là 1?",
+        "options": {
+            "A": "Oxy",
+            "B": "Heli",
+            "C": "Carbon",
+            "D": "Hydro"
+        },
+        "answer": "D"
+    },
+    {
+        "level": 7,
+        "question": "Con đường tơ lụa (Silk Road) là tuyến đường thương mại lịch sử nối liền hai khu vực nào?",
+        "options": {
+            "A": "Châu Âu và Châu Phi",
+            "B": "Châu Á và Châu Mỹ",
+            "C": "Châu Á và Châu Âu",
+            "D": "Bắc Phi và Trung Đông"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 8,
+        "question": "Trong thần thoại Ai Cập, vị thần của thế giới bên kia, người phán xét linh hồn, có đầu là loài vật nào?",
+        "options": {
+            "A": "Đầu chim ưng (Horus)",
+            "B": "Đầu chó rừng (Anubis)",
+            "C": "Đầu cá sấu (Sobek)",
+            "D": "Đầu mèo (Bastet)"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 9,
+        "question": "Ai là người đã phát triển thuyết tương đối hẹp và thuyết tương đối rộng?",
+        "options": {
+            "A": "Isaac Newton",
+            "B": "Galileo Galilei",
+            "C": "Albert Einstein",
+            "D": "Stephen Hawking"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 10,
+        "question": "Năm 1969, Neil Armstrong đã trở thành người đầu tiên đi bộ trên Mặt Trăng trong khuôn khổ sứ mệnh không gian nào?",
+        "options": {
+            "A": "Apollo 10",
+            "B": "Apollo 11",
+            "C": "Apollo 13",
+            "D": "Gemini 8"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 11,
+        "question": "Trong lĩnh vực logic và khoa học máy tính, 'Lambda Calculus', một hệ thống hình thức để biểu diễn tính toán dựa trên sự trừu tượng hóa và áp dụng hàm, được phát minh bởi nhà toán học nào?",
+        "options": {
+            "A": "Alan Turing",
+            "B": "John von Neumann",
+            "C": "Alonzo Church",
+            "D": "Kurt Gödel"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 12,
+        "question": "Bản thảo Voynich là một cuốn sách bí ẩn được viết bằng một hệ thống chữ viết và ngôn ngữ không xác định. Đặc điểm nổi bật nhất của nó là gì?",
+        "options": {
+            "A": "Chỉ chứa các công thức toán học",
+            "B": "Các hình minh họa chi tiết về thực vật, thiên văn và con người không tồn tại",
+            "C": "Được viết hoàn toàn bằng vàng",
+            "D": "Kể lại lịch sử của một nền văn minh đã mất"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 13,
+        "question": "Trong kinh tế học, 'Đường cong Phillips' mô tả mối quan hệ nghịch đảo ngắn hạn giữa hai yếu tố nào?",
+        "options": {
+            "A": "Cung và cầu",
+            "B": "Lãi suất và đầu tư",
+            "C": "Tỷ lệ lạm phát và tỷ lệ thất nghiệp",
+            "D": "Thuế và doanh thu của chính phủ"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 14,
+        "question": "Trong vật lý hạt, 'bài toán phân rã beta' ban đầu dường như vi phạm định luật bảo toàn năng lượng, dẫn đến việc Wolfgang Pauli đề xuất sự tồn tại của hạt nào?",
+        "options": {
+            "A": "Quark",
+            "B": "Neutron",
+            "C": "Positron",
+            "D": "Neutrino"
+        },
+        "answer": "D"
+    },
+    {
+        "level": 15,
+        "question": "Trong lịch sử, 'Cuộc khủng hoảng tên lửa Cuba' năm 1962 đã được giải quyết một phần thông qua một thỏa thuận bí mật, trong đó Mỹ đồng ý làm gì để đổi lấy việc Liên Xô rút tên lửa khỏi Cuba?",
+        "options": {
+            "A": "Chấm dứt lệnh cấm vận thương mại",
+            "B": "Cung cấp viện trợ kinh tế cho Cuba",
+            "C": "Rút các tên lửa Jupiter của Mỹ khỏi Thổ Nhĩ Kỳ và Ý",
+            "D": "Công nhận chính quyền của Fidel Castro"
+        },
+        "answer": "C"
+    }
+]

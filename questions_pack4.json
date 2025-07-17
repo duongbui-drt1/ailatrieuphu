@@ -1,0 +1,167 @@
+[
+    {
+        "level": 1,
+        "question": "Mặt Trời mọc ở hướng nào?",
+        "options": {
+            "A": "Hướng Đông",
+            "B": "Hướng Tây",
+            "C": "Hướng Nam",
+            "D": "Hướng Bắc"
+        },
+        "answer": "A"
+    },
+    {
+        "level": 2,
+        "question": "Đâu là một loại nhạc cụ có dây?",
+        "options": {
+            "A": "Sáo",
+            "B": "Trống",
+            "C": "Kèn",
+            "D": "Đàn guitar"
+        },
+        "answer": "D"
+    },
+    {
+        "level": 3,
+        "question": "Thủ đô của nước Mỹ là thành phố nào?",
+        "options": {
+            "A": "New York",
+            "B": "Los Angeles",
+            "C": "Washington, D.C.",
+            "D": "Chicago"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 4,
+        "question": "Trong bảng chữ cái tiếng Anh có bao nhiêu chữ cái?",
+        "options": {
+            "A": "24",
+            "B": "25",
+            "C": "26",
+            "D": "27"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 5,
+        "question": "Nhân vật chính trong bộ phim hoạt hình 'Vua sư tử' của Disney tên là gì?",
+        "options": {
+            "A": "Mufasa",
+            "B": "Scar",
+            "C": "Simba",
+            "D": "Timon"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 6,
+        "question": "Trong triết học, ai là người được coi là cha đẻ của triết học phương Tây?",
+        "options": {
+            "A": "Plato",
+            "B": "Aristotle",
+            "C": "Socrates",
+            "D": "Thales"
+        },
+        "answer": "D"
+    },
+    {
+        "level": 7,
+        "question": "Hiệp ước Versailles, ký kết năm 1919, chính thức kết thúc cuộc chiến tranh nào?",
+        "options": {
+            "A": "Chiến tranh Napoléon",
+            "B": "Chiến tranh thế giới thứ hai",
+            "C": "Chiến tranh thế giới thứ nhất",
+            "D": "Chiến tranh Lạnh"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 8,
+        "question": "Trong sinh học, quá trình thực vật sử dụng ánh sáng mặt trời để tạo ra năng lượng được gọi là gì?",
+        "options": {
+            "A": "Hô hấp",
+            "B": "Quang hợp",
+            "C": "Thẩm thấu",
+            "D": "Bay hơi"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 9,
+        "question": "Kiến trúc sư nào đã thiết kế Nhà hát Opera Sydney ở Úc?",
+        "options": {
+            "A": "Frank Lloyd Wright",
+            "B": "Le Corbusier",
+            "C": "Zaha Hadid",
+            "D": "Jørn Utzon"
+        },
+        "answer": "D"
+    },
+    {
+        "level": 10,
+        "question": "Trong bộ truyện 'Chúa tể của những chiếc nhẫn', chiếc nhẫn quyền lực (One Ring) được rèn trong ngọn núi nào?",
+        "options": {
+            "A": "Núi Cô đơn (Lonely Mountain)",
+            "B": "Núi Doom (Mount Doom)",
+            "C": "Dãy núi Sương mù (Misty Mountains)",
+            "D": "Dãy núi Ephel Dúath"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 11,
+        "question": "Trong toán học, 'Giả thuyết Riemann' là một bài toán chưa được giải quyết liên quan đến sự phân bố của các số nào?",
+        "options": {
+            "A": "Số hoàn hảo",
+            "B": "Số nguyên tố",
+            "C": "Số vô tỷ",
+            "D": "Số Fibonacci"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 12,
+        "question": "Trong lịch sử điện ảnh, kỹ thuật 'Kuleshov Effect' chứng minh rằng khán giả có thể suy ra ý nghĩa từ sự tương tác của hai cảnh quay liên tiếp, ngay cả khi không có mối liên hệ thực tế. Nó được đặt theo tên của nhà làm phim người nước nào?",
+        "options": {
+            "A": "Pháp",
+            "B": "Đức",
+            "C": "Liên Xô",
+            "D": "Mỹ"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 13,
+        "question": "Trong vật lý, 'Sự kiện Tunguska' năm 1908 là một vụ nổ cực lớn ở Siberia, được cho là do nguyên nhân nào gây ra?",
+        "options": {
+            "A": "Một vụ phun trào núi lửa dưới lòng đất",
+            "B": "Thử nghiệm vũ khí hạt nhân bí mật",
+            "C": "Sự va chạm hoặc nổ trên không của một thiên thạch hoặc sao chổi",
+            "D": "Một tai nạn của phi thuyền ngoài hành tinh"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 14,
+        "question": "Trong ngôn ngữ học, 'Giả thuyết Sapir-Whorf' đề xuất mối quan hệ nào?",
+        "options": {
+            "A": "Tất cả các ngôn ngữ đều có chung một cấu trúc ngữ pháp phổ quát",
+            "B": "Cấu trúc của một ngôn ngữ ảnh hưởng đến cách người nói nó nhận thức thế giới",
+            "C": "Ngôn ngữ của trẻ em phát triển qua các giai đoạn có thể dự đoán được",
+            "D": "Âm thanh của từ ngữ có mối liên hệ trực tiếp với ý nghĩa của chúng"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 15,
+        "question": "Trong lịch sử La Mã, 'Lex Gabinia' là một đạo luật được thông qua vào năm 67 TCN đã trao quyền lực quân sự đặc biệt và chưa từng có cho một vị tướng để làm gì?",
+        "options": {
+            "A": "Chinh phục xứ Gaul",
+            "B": "Dẹp tan cuộc nổi dậy của Spartacus",
+            "C": "Tiêu diệt nạn cướp biển trên Địa Trung Hải",
+            "D": "Xây dựng lại thành Rome sau một trận hỏa hoạn"
+        },
+        "answer": "C"
+    }
+]

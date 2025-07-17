@@ -1,0 +1,167 @@
+[
+    {
+        "level": 1,
+        "question": "Đâu là hành tinh gần Mặt Trời nhất?",
+        "options": {
+            "A": "Sao Hỏa",
+            "B": "Sao Kim",
+            "C": "Trái Đất",
+            "D": "Sao Thủy"
+        },
+        "answer": "D"
+    },
+    {
+        "level": 2,
+        "question": "Trong môn bóng đá, một đội có bao nhiêu cầu thủ trên sân?",
+        "options": {
+            "A": "9",
+            "B": "10",
+            "C": "11",
+            "D": "12"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 3,
+        "question": "Thủ đô của nước Anh là thành phố nào?",
+        "options": {
+            "A": "Manchester",
+            "B": "Liverpool",
+            "C": "London",
+            "D": "Birmingham"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 4,
+        "question": "Công thức hóa học của nước là gì?",
+        "options": {
+            "A": "CO2",
+            "B": "O2",
+            "C": "NaCl",
+            "D": "H2O"
+        },
+        "answer": "D"
+    },
+    {
+        "level": 5,
+        "question": "Ai là tác giả của bộ truyện 'Harry Potter'?",
+        "options": {
+            "A": "J.R.R. Tolkien",
+            "B": "George R.R. Martin",
+            "C": "J.K. Rowling",
+            "D": "C.S. Lewis"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 6,
+        "question": "Trong lịch sử La Mã, ai là vị hoàng đế đầu tiên?",
+        "options": {
+            "A": "Julius Caesar",
+            "B": "Nero",
+            "C": "Augustus",
+            "D": "Constantine"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 7,
+        "question": "Trong vật lý, định luật nào phát biểu rằng 'lực tác dụng lên một vật bằng khối lượng nhân với gia tốc của nó' (F=ma)?",
+        "options": {
+            "A": "Định luật vạn vật hấp dẫn",
+            "B": "Định luật thứ hai của Newton",
+            "C": "Định luật bảo toàn năng lượng",
+            "D": "Định luật Ohm"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 8,
+        "question": "Thành phố nào của Nhật Bản đã bị ném quả bom nguyên tử thứ hai vào năm 1945?",
+        "options": {
+            "A": "Tokyo",
+            "B": "Kyoto",
+            "C": "Hiroshima",
+            "D": "Nagasaki"
+        },
+        "answer": "D"
+    },
+    {
+        "level": 9,
+        "question": "Họa sĩ nào là người tiên phong của trường phái Lập thể (Cubism)?",
+        "options": {
+            "A": "Vincent van Gogh",
+            "B": "Claude Monet",
+            "C": "Salvador Dalí",
+            "D": "Pablo Picasso"
+        },
+        "answer": "D"
+    },
+    {
+        "level": 10,
+        "question": "Trong thần thoại Bắc Âu, 'Ragnarok' là thuật ngữ chỉ điều gì?",
+        "options": {
+            "A": "Lễ hội của các vị thần",
+            "B": "Trận chiến cuối cùng, ngày tận thế",
+            "C": "Cây thế giới",
+            "D": "Vùng đất của người khổng lồ"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 11,
+        "question": "Trong hội họa thời Phục hưng, loại bột màu xanh lam quý giá và đắt hơn vàng, được nghiền từ đá Lapis Lazuli, có tên gọi là gì?",
+        "options": {
+            "A": "Prussian Blue",
+            "B": "Cobalt Blue",
+            "C": "Ultramarine",
+            "D": "Cerulean Blue"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 12,
+        "question": "Paradox 'Con tàu của Theseus' trong triết học đặt ra câu hỏi về khái niệm nào?",
+        "options": {
+            "A": "Bản chất của thời gian",
+            "B": "Sự tồn tại của ý chí tự do",
+            "C": "Bản sắc và sự thay đổi theo thời gian",
+            "D": "Nguồn gốc của đạo đức"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 13,
+        "question": "Trong mật mã học, 'máy Enigma' của Đức Quốc xã cuối cùng đã bị giải mã tại Bletchley Park nhờ vào việc khai thác điểm yếu nào?",
+        "options": {
+            "A": "Sử dụng cùng một khóa mã mỗi ngày",
+            "B": "Một chữ cái không bao giờ được mã hóa thành chính nó",
+            "C": "Bảng cắm (plugboard) có quá ít kết hợp",
+            "D": "Tốc độ quay của các rotor quá chậm"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 14,
+        "question": "Trong y học, các protein bị gấp sai cấu trúc và có khả năng 'lây nhiễm' gây ra các bệnh như bệnh bò điên được gọi là gì?",
+        "options": {
+            "A": "Viroid",
+            "B": "Plasmid",
+            "C": "Prion",
+            "D": "Bacteriophage"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 15,
+        "question": "Cơ cấu Antikythera, được coi là máy tính analog cổ đại phức tạp nhất, được phát hiện có chức năng chính là để dự đoán điều gì với độ chính xác đáng kinh ngạc?",
+        "options": {
+            "A": "Chu kỳ của sao chổi Halley",
+            "B": "Thời điểm diễn ra các kỳ Olympic",
+            "C": "Nhật thực và nguyệt thực",
+            "D": "Vị trí của các hành tinh ngoài Hệ Mặt Trời"
+        },
+        "answer": "C"
+    }
+]

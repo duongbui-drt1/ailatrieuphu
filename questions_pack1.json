@@ -1,0 +1,167 @@
+[
+    {
+        "level": 1,
+        "question": "Đâu là đại dương lớn nhất trên Trái Đất?",
+        "options": {
+            "A": "Đại Tây Dương",
+            "B": "Ấn Độ Dương",
+            "C": "Thái Bình Dương",
+            "D": "Bắc Băng Dương"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 2,
+        "question": "Trong truyện cổ tích 'Nàng Bạch Tuyết và bảy chú lùn', Bạch Tuyết đã ăn phải thứ gì bị tẩm độc?",
+        "options": {
+            "A": "Quả lê",
+            "B": "Quả táo",
+            "C": "Cái bánh",
+            "D": "Cốc nước"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 3,
+        "question": "Thủ đô của nước Ý là thành phố nào?",
+        "options": {
+            "A": "Venice",
+            "B": "Milan",
+            "C": "Florence",
+            "D": "Rome"
+        },
+        "answer": "D"
+    },
+    {
+        "level": 4,
+        "question": "Loài vật nào sau đây có khả năng bay?",
+        "options": {
+            "A": "Cá sấu",
+            "B": "Chim cánh cụt",
+            "C": "Đà điểu",
+            "D": "Dơi"
+        },
+        "answer": "D"
+    },
+    {
+        "level": 5,
+        "question": "Kim tự tháp Giza là công trình kiến trúc nổi tiếng ở quốc gia nào?",
+        "options": {
+            "A": "Hy Lạp",
+            "B": "Mexico",
+            "C": "Ai Cập",
+            "D": "Sudan"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 6,
+        "question": "Trong thần thoại Hy Lạp, ai là người đã đánh bại quái vật Minotaur trong mê cung?",
+        "options": {
+            "A": "Hercules",
+            "B": "Perseus",
+            "C": "Theseus",
+            "D": "Achilles"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 7,
+        "question": "Hiệu ứng Coriolis giải thích cho hiện tượng tự nhiên nào sau đây?",
+        "options": {
+            "A": "Sự hình thành của cầu vồng",
+            "B": "Sự lệch hướng của các dòng hải lưu và cơn bão",
+            "C": "Sự thay đổi của thủy triều",
+            "D": "Sự xuất hiện của cực quang"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 8,
+        "question": "Nhà văn nào là tác giả của tiểu thuyết 'Chiến tranh và Hòa bình'?",
+        "options": {
+            "A": "Fyodor Dostoevsky",
+            "B": "Leo Tolstoy",
+            "C": "Anton Chekhov",
+            "D": "Alexander Pushkin"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 9,
+        "question": "Trong lĩnh vực máy tính, 'GPU' là viết tắt của cụm từ nào?",
+        "options": {
+            "A": "General Processing Unit",
+            "B": "Gaming Performance Unit",
+            "C": "Graphics Processing Unit",
+            "D": "Geometric Progression Utility"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 10,
+        "question": "Trận Waterloo năm 1815 đã đặt dấu chấm hết cho sự nghiệp của nhà lãnh đạo quân sự nào?",
+        "options": {
+            "A": "Julius Caesar",
+            "B": "Alexander Đại đế",
+            "C": "Thành Cát Tư Hãn",
+            "D": "Napoléon Bonaparte"
+        },
+        "answer": "D"
+    },
+    {
+        "level": 11,
+        "question": "Trong thuật toán tìm kiếm chuỗi Knuth-Morris-Pratt (KMP), cấu trúc dữ liệu nào được tiền xử lý từ mẫu tìm kiếm để tránh việc so sánh lại các ký tự đã khớp?",
+        "options": {
+            "A": "Cây hậu tố (Suffix Tree)",
+            "B": "Bảng băm (Hash Table)",
+            "C": "Mảng Z (Z-array)",
+            "D": "Bảng tiền tố (Prefix table) / Hàm thất bại (Failure function)"
+        },
+        "answer": "D"
+    },
+    {
+        "level": 12,
+        "question": "Hệ thống chữ viết nào của nền văn minh Minoan (tiền Hy Lạp) cho đến nay vẫn chưa được giải mã hoàn toàn, khác với 'người kế nhiệm' của nó là Linear B?",
+        "options": {
+            "A": "Chữ tượng hình Ai Cập",
+            "B": "Chữ hình nêm",
+            "C": "Linear A",
+            "D": "Chữ Phoenicia"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 13,
+        "question": "Trong vật lý thiên văn, 'Giới hạn Chandrasekhar' xác định khối lượng tối đa của loại thiên thể nào trước khi nó sụp đổ thành sao neutron hoặc lỗ đen?",
+        "options": {
+            "A": "Sao lùn đỏ",
+            "B": "Sao lùn trắng",
+            "C": "Sao khổng lồ xanh",
+            "D": "Sao lùn nâu"
+        },
+        "answer": "B"
+    },
+    {
+        "level": 14,
+        "question": "Trong sinh học, 'vụ nổ kỷ Cambri' (Cambrian explosion) là thuật ngữ chỉ sự kiện nào?",
+        "options": {
+            "A": "Một vụ va chạm tiểu hành tinh lớn",
+            "B": "Sự tuyệt chủng hàng loạt của các loài khủng long",
+            "C": "Sự gia tăng đột ngột và đa dạng hóa nhanh chóng của các sinh vật đa bào",
+            "D": "Sự hình thành của tầng ozone"
+        },
+        "answer": "C"
+    },
+    {
+        "level": 15,
+        "question": "Định lý bất toàn của Kurt Gödel đã chứng minh một sự thật nền tảng gây chấn động trong toán học và logic, đó là gì?",
+        "options": {
+            "A": "Mọi mệnh đề toán học đều có thể được chứng minh hoặc bác bỏ",
+            "B": "Toán học là một hệ thống hoàn chỉnh và nhất quán",
+            "C": "Trong bất kỳ hệ thống tiên đề nào đủ phức tạp, luôn tồn tại những mệnh đề đúng nhưng không thể chứng minh",
+            "D": "Vô hạn có nhiều kích thước khác nhau"
+        },
+        "answer": "C"
+    }
+]
