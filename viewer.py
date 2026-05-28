@@ -8,14 +8,15 @@ try:
 except ImportError:
     messagebox.showerror("Thiếu thư viện", "Vui lòng cài đặt: pip install Pillow")
     exit()
+from audio_backend import AudioManager
 
 # --- CẤU HÌNH ---
 PORT = 65432
 BUFFER_SIZE = 4096
 PRIZE_LEVELS = [
-    "150.000.000", "85.000.000", "60.000.000", "40.000.000", "30.000.000", "22.000.000",
-    "14.000.000", "10.000.000", "6.000.000", "3.000.000", "2.000.000", "1.000.000",
-    "600.000", "400.000", "200.000"
+    "500.000.000", "250.000.000", "120.000.000", "60.000.000", "30.000.000",
+    "22.000.000", "14.000.000", "10.000.000", "8.000.000", "6.000.000",
+    "5.000.000", "4.000.000", "3.000.000", "2.000.000", "1.000.000"
 ]
 
 # Màu sắc (giống hệt client)
@@ -25,9 +26,9 @@ WIDGET_BG = "#07143a"
 PANEL_BG = "#091b4d"
 PANEL_BORDER = "#d7b75a"
 TEXT_MUTED = "#aebbe8"
-MILESTONE_COLOR = "#f39c12"
+MILESTONE_COLOR = "#ffffff"
 CURRENT_COLOR = "#f1c40f"
-DEFAULT_PRIZE_COLOR = "#3498db"
+DEFAULT_PRIZE_COLOR = "#f39c12"
 PASSED_PRIZE_COLOR = "#7f8c8d"
 ANSWER_STYLES = {
     "normal": {"bg": "#102a73", "fg": "#ffffff", "border": "#d7b75a"},
@@ -49,6 +50,7 @@ class ViewerGUI(tk.Tk):
         self.scene_countdown_job = None
         self.scene_remaining_seconds = 0
         self.final_scene_active = False
+        self.audio_manager = AudioManager()
 
         self.load_assets()
         self.create_widgets()
@@ -272,6 +274,26 @@ class ViewerGUI(tk.Tk):
             self.scene_countdown_job = None
         self.scene_frame.place_forget()
 
+    def play_scene_audio(self, sound_name, loop=False):
+        self.audio_manager.stop_all()
+        if sound_name and self.audio_manager.has_sound(sound_name):
+            self.audio_manager.play(sound_name, loop=loop)
+
+    def stop_scene_audio(self):
+        self.audio_manager.stop_all()
+
+    def play_final_audio(self):
+        self.audio_manager.stop_all()
+        if self.audio_manager.has_sound('end_buzzer'):
+            self.audio_manager.play('end_buzzer')
+            self.after(1200, self.play_program_end_audio)
+        else:
+            self.play_program_end_audio()
+
+    def play_program_end_audio(self):
+        if self.audio_manager.has_sound('program_end'):
+            self.audio_manager.play('program_end')
+
     def show_viewer_scene(self, data):
         scene = data.get('scene', 'standby')
         title = data.get('title', '')
@@ -280,6 +302,7 @@ class ViewerGUI(tk.Tk):
         stats = data.get('stats', {})
 
         if scene == 'game':
+            self.play_scene_audio(data.get('sound'), data.get('sound_loop', False))
             self.hide_overlay()
             return
         if scene == 'blank':
@@ -320,6 +343,7 @@ class ViewerGUI(tk.Tk):
         self.scene_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
         self.scene_frame.tkraise()
         self.start_scene_countdown(data.get('countdown_seconds', 0))
+        self.play_scene_audio(data.get('sound'), data.get('sound_loop', False))
 
     def prize_scene_text(self):
         lines = []
@@ -426,16 +450,22 @@ class ViewerGUI(tk.Tk):
         elif msg_type == 'game_ended_waiting':
             if not self.final_scene_active:
                 self.reset_ui_for_new_game()
+
     def update_question_display(self, data):
         """Cập nhật giao diện với câu hỏi và các lựa chọn mới."""
+        self.stop_scene_audio()
         self.final_scene_active = False
         self.current_level = data['level']
         self.lbl_question.config(text=f"CÂU {self.current_level} - {data['prize']} VNĐ\n{data['question']}")
 
         for option, btn in self.option_buttons.items():
-            self.place_answer_button(option)
-            btn.config(text=f"{option}: {data['options'][option]}")
-            self.style_answer_button(option, "normal")
+            option_text = data['options'].get(option, '')
+            if option_text:
+                self.place_answer_button(option)
+                btn.config(text=f"{option}: {option_text}")
+                self.style_answer_button(option, "normal")
+            else:
+                btn.place_forget()
 
         self.update_prize_display(self.current_level)
         self.status_bar.config(text=f"Đang chờ thí sinh trả lời câu {self.current_level}...")
@@ -505,6 +535,7 @@ class ViewerGUI(tk.Tk):
 
     def show_final_scene(self, data, is_win):
         self.final_scene_active = True
+        self.play_final_audio()
         player_name = data.get('player_name', 'Thí sinh')
         prize = data.get('prize', '0')
         title = "CHÚC MỪNG HOÀN THÀNH PHẦN THI" if is_win else "PHẦN THI KẾT THÚC"
@@ -514,6 +545,7 @@ class ViewerGUI(tk.Tk):
     def reset_ui_for_new_game(self):
         """Reset giao diện để chờ lượt chơi mới."""
         self.final_scene_active = False
+        self.stop_scene_audio()
         self.show_overlay("Lượt chơi đã kết thúc. Chờ người chơi mới...")
         self.current_level = 0
         self.update_prize_display(0)
@@ -535,6 +567,7 @@ class ViewerGUI(tk.Tk):
 
     def on_closing(self):
         """Dọn dẹp tài nguyên khi đóng cửa sổ."""
+        self.stop_scene_audio()
         if self.viewer_socket:
             try:
                 self.viewer_socket.close()

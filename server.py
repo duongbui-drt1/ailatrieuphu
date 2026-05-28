@@ -14,12 +14,13 @@ BUFFER_SIZE = 4096
 # --- DỮ LIỆU GAME ---
 QUESTIONS = []
 PRIZE_LEVELS = [
-    "200.000", "400.000", "600.000", "1.000.000", "2.000.000", "3.000.000",
-    "6.000.000", "10.000.000", "14.000.000", "22.000.000", "30.000.000",
-    "40.000.000", "60.000.000", "85.000.000", "150.000.000"
+    "1.000.000", "2.000.000", "3.000.000", "4.000.000", "5.000.000",
+    "6.000.000", "8.000.000", "10.000.000", "14.000.000", "22.000.000",
+    "30.000.000", "60.000.000", "120.000.000", "250.000.000", "500.000.000"
 ]
 READY_REQUIRED_FROM_LEVEL = 6
-LOSS_GUARANTEE_FROM_LEVEL_10 = "2.000.000"
+LOSS_GUARANTEE_FROM_LEVEL_6 = "5.000.000"
+LOSS_GUARANTEE_FROM_LEVEL_11 = "22.000.000"
 
 # --- BIẾN TOÀN CỤC ---
 player_conn = None
@@ -136,7 +137,7 @@ def resend_current_state_from_host():
         resent = True
     return resent
 
-def set_viewer_scene(scene, title="", message="", countdown_seconds=0, payload=None):
+def set_viewer_scene(scene, title="", message="", countdown_seconds=0, payload=None, sound=None, sound_loop=False):
     global current_viewer_scene_packet
     current_viewer_scene_packet = {
         'type': 'viewer_scene',
@@ -145,6 +146,8 @@ def set_viewer_scene(scene, title="", message="", countdown_seconds=0, payload=N
         'message': message,
         'countdown_seconds': countdown_seconds,
         'payload': payload or {},
+        'sound': sound,
+        'sound_loop': sound_loop,
         'stats': current_stats,
         'timestamp': time.time(),
     }
@@ -155,7 +158,7 @@ def show_game_scene_from_host():
     global current_viewer_scene_packet
     current_viewer_scene_packet = None
     if current_game_state_packet:
-        broadcast_to_viewers(current_game_state_packet)
+        broadcast_to_viewers({'type': 'viewer_scene', 'scene': 'game', 'sound': 'viewer_game', 'sound_loop': False})
         return True
     set_viewer_scene('standby', 'AI LÀ TRIỆU PHÚ', 'Đang chờ thí sinh bắt đầu...')
     return False
@@ -266,9 +269,11 @@ def needs_ready_confirmation(level):
     return level >= READY_REQUIRED_FROM_LEVEL
 
 def final_prize_on_wrong(level, current_prize):
-    if level >= 10:
-        return LOSS_GUARANTEE_FROM_LEVEL_10
-    return current_prize or "0"
+    if level >= 11:
+        return LOSS_GUARANTEE_FROM_LEVEL_11
+    if level >= 6:
+        return LOSS_GUARANTEE_FROM_LEVEL_6
+    return "0"
 
 def load_random_question_pack():
     global QUESTIONS

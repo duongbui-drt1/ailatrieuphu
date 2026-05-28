@@ -17,9 +17,9 @@ from audio_backend import AudioManager
 PORT = 65432
 BUFFER_SIZE = 4096
 PRIZE_LEVELS = [
-    "150.000.000", "85.000.000", "60.000.000", "40.000.000", "30.000.000", "22.000.000",
-    "14.000.000", "10.000.000", "6.000.000", "3.000.000", "2.000.000", "1.000.000",
-    "600.000", "400.000", "200.000"
+    "500.000.000", "250.000.000", "120.000.000", "60.000.000", "30.000.000",
+    "22.000.000", "14.000.000", "10.000.000", "8.000.000", "6.000.000",
+    "5.000.000", "4.000.000", "3.000.000", "2.000.000", "1.000.000"
 ]
 
 # Màu sắc - làm đậm màu đáp án
@@ -29,9 +29,9 @@ WIDGET_BG = "#07143a"
 PANEL_BG = "#091b4d"
 PANEL_BORDER = "#d7b75a"
 TEXT_MUTED = "#aebbe8"
-MILESTONE_COLOR = "#f39c12"  # Đậm hơn
+MILESTONE_COLOR = "#ffffff"
 CURRENT_COLOR = "#f1c40f"    # Đậm hơn
-DEFAULT_PRIZE_COLOR = "#3498db"  # Đậm hơn
+DEFAULT_PRIZE_COLOR = "#f39c12"
 PASSED_PRIZE_COLOR = "#7f8c8d"
 
 class GameClientGUI(tk.Toplevel):
@@ -51,6 +51,9 @@ class GameClientGUI(tk.Toplevel):
         self.current_level = 0
         self.game_has_ended = False
         self.final_animation_job = None
+        self.pending_lifeline_type = None
+        self.pending_lifeline_job = None
+        self.lifeline_audio_job = None
 
         self.load_assets()
         self.create_widgets()
@@ -269,13 +272,19 @@ class GameClientGUI(tk.Toplevel):
         self.game_has_ended = False
         self.current_level = data['level']
         self.current_lifelines_state = data['lifelines']
+        if self.pending_lifeline_type == '5050':
+            self.finish_lifeline('5050', update_buttons=False)
         self.lbl_question.config(text=f"CÂU {self.current_level} - {data['prize']} VNĐ\n{data['question']}")
 
         for option, btn in self.option_buttons.items():
             pos = self.option_positions[option]
-            btn.place(relx=pos['relx'], rely=pos['rely'], anchor=tk.CENTER)
-            btn.config(text=f"{option}: {data['options'][option]}",
-                      state="normal", image=self.btn_images['normal'])
+            option_text = data['options'].get(option, '')
+            if option_text:
+                btn.place(relx=pos['relx'], rely=pos['rely'], anchor=tk.CENTER)
+                btn.config(text=f"{option}: {option_text}",
+                          state="normal", image=self.btn_images['normal'])
+            else:
+                btn.place_forget()
 
         self.update_lifeline_buttons()
         self.update_prize_display()
@@ -285,7 +294,9 @@ class GameClientGUI(tk.Toplevel):
     def update_lifeline_buttons(self):
         for key, btn in self.lifeline_buttons.items():
             is_available = self.current_lifelines_state.get(key, False)
-            if key == 'wise_man' and self.current_level < 5:
+            if key == 'wise_man' and self.current_level < 6:
+                is_available = False
+            if self.pending_lifeline_type:
                 is_available = False
             btn.config(state="normal" if is_available else "disabled")
 
@@ -310,21 +321,30 @@ class GameClientGUI(tk.Toplevel):
         elif 11 <= self.current_level <= 15:
             self.audio_manager.play('wait_11_15', loop=True)
 
+    def set_visible_answer_buttons_state(self, state):
+        for btn in self.option_buttons.values():
+            if btn.winfo_ismapped():
+                btn.config(state=state)
+
     def handle_lifeline_result(self, data):
-        self.play_music_by_level()
         lifeline_type = data['lifeline']
+        self.current_lifelines_state[lifeline_type] = False
 
         if lifeline_type == 'audience':
-            opinions = data['opinions']
+            opinions = data.get('opinions', [])
             message = "Ý kiến từ 3 khán giả may mắn:\n\n"
-            message += "\n".join([f"  - Khán giả {i+1} chọn: {ans}" for i, ans in enumerate(opinions)])
+            if opinions:
+                message += "\n".join([f"  - Khán giả {i+1} chọn: {ans}" for i, ans in enumerate(opinions)])
+            else:
+                message += "Không có dữ liệu hợp lệ từ khán giả."
             messagebox.showinfo("Trợ giúp", message)
         elif lifeline_type in ['call', 'wise_man']:
             messagebox.showinfo("Trợ giúp", data['message'])
 
-        self.update_lifeline_buttons()
+        self.finish_lifeline(lifeline_type)
 
     def send_answer(self, answer):
+        self.cancel_pending_lifeline(update_buttons=False)
         self.audio_manager.play('selected')
 
         # Disable all buttons
@@ -489,22 +509,70 @@ class GameClientGUI(tk.Toplevel):
         sound_by_type = {
             '5050': 'lifeline_5050',
             'audience': 'audience_countdown',
+            'call': 'lifeline_call',
             'wise_man': 'lifeline_wise_man',
         }
         sound_name = sound_by_type.get(lifeline_type, 'lifeline')
+        self.audio_manager.stop_all()
+        if self.audio_manager.has_sound('lifeline_click'):
+            self.audio_manager.play('lifeline_click')
+            self.lifeline_audio_job = self.after(650, lambda: self.play_lifeline_intro(sound_name))
+        else:
+            self.play_lifeline_intro(sound_name)
+
+    def play_lifeline_intro(self, sound_name):
+        self.lifeline_audio_job = None
         if self.audio_manager.has_sound(sound_name):
             self.audio_manager.play(sound_name, loop=False)
         else:
             self.audio_manager.play('lifeline', loop=True)
 
-    def use_lifeline(self, lifeline_type):
-        self.play_lifeline_audio(lifeline_type)
-        self.lifeline_buttons[lifeline_type].config(state="disabled")
+    def cancel_pending_lifeline(self, update_buttons=True):
+        if self.pending_lifeline_job:
+            try:
+                self.after_cancel(self.pending_lifeline_job)
+            except tk.TclError:
+                pass
+            self.pending_lifeline_job = None
+        if self.lifeline_audio_job:
+            try:
+                self.after_cancel(self.lifeline_audio_job)
+            except tk.TclError:
+                pass
+            self.lifeline_audio_job = None
+        self.pending_lifeline_type = None
+        if update_buttons:
+            self.update_lifeline_buttons()
+
+    def finish_lifeline(self, lifeline_type=None, update_buttons=True):
+        self.pending_lifeline_job = None
+        self.pending_lifeline_type = None
+        self.play_music_by_level()
+        self.set_visible_answer_buttons_state("normal")
+        if update_buttons:
+            self.update_lifeline_buttons()
+
+    def send_lifeline_request(self, lifeline_type):
+        self.pending_lifeline_job = None
         self.send_data({
             'action': 'lifeline',
             'value': lifeline_type,
             'timestamp': time.time()
         })
+
+    def use_lifeline(self, lifeline_type):
+        if self.pending_lifeline_type:
+            self.status_bar.config(text="Đang chạy hiệu ứng trợ giúp, vui lòng chờ kết quả...")
+            return
+        if not self.current_lifelines_state.get(lifeline_type, False):
+            return
+        self.play_lifeline_audio(lifeline_type)
+        self.pending_lifeline_type = lifeline_type
+        self.current_lifelines_state[lifeline_type] = False
+        self.set_visible_answer_buttons_state("disabled")
+        self.update_lifeline_buttons()
+        self.status_bar.config(text="Đã chọn trợ giúp. Đang chạy hiệu ứng 5 giây trước khi mở kết quả...")
+        self.pending_lifeline_job = self.after(5000, lambda: self.send_lifeline_request(lifeline_type))
 
     def send_data(self, data):
         try:
@@ -521,27 +589,41 @@ class GameClientGUI(tk.Toplevel):
         self.show_overlay(message, show_return_btn=True)
         self.start_final_animation(is_win)
 
+    def play_final_audio(self, is_win):
+        self.audio_manager.stop_all()
+        delay = 0
+        if self.audio_manager.has_sound('end_buzzer'):
+            self.audio_manager.play('end_buzzer')
+            delay = 1200
+
+        def play_main_theme():
+            if self.audio_manager.has_sound('program_end'):
+                self.audio_manager.play('program_end')
+            elif is_win and self.audio_manager.has_sound('complete'):
+                self.audio_manager.play('complete')
+            elif is_win:
+                self.audio_manager.play('win')
+            else:
+                self.audio_manager.play('end_game')
+
+        if delay:
+            self.after(delay, play_main_theme)
+        else:
+            play_main_theme()
+
     def handle_win(self, data=None):
         data = data or {}
-        self.audio_manager.stop_all()
-        if self.audio_manager.has_sound('complete'):
-            self.audio_manager.play('complete')
-        else:
-            self.audio_manager.play('win')
+        self.play_final_audio(True)
         self.show_final_overlay(
             "CHÚC MỪNG ĐÃ HOÀN THÀNH PHẦN THI",
             data.get('player_name', self.player_name),
-            data.get('prize', '150.000.000'),
+            data.get('prize', '500.000.000'),
             True,
         )
 
     def handle_game_over(self, data=None):
         data = data or {}
-        self.audio_manager.stop_all()
-        if self.audio_manager.has_sound('end_game'):
-            self.audio_manager.play('end_game')
-        else:
-            self.audio_manager.play('wrong')
+        self.play_final_audio(False)
         self.show_final_overlay(
             "PHẦN THI KẾT THÚC",
             data.get('player_name', self.player_name),
@@ -559,6 +641,7 @@ class GameClientGUI(tk.Toplevel):
 
     def on_closing(self):
         self.stop_final_animation()
+        self.cancel_pending_lifeline(update_buttons=False)
         self.audio_manager.stop_all()
         if self.client_socket:
             try:

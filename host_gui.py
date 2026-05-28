@@ -326,7 +326,7 @@ class HostGUI(tk.Tk):
         self.log("Viewer: quay lại màn game.")
 
     def show_prize_scene(self):
-        server_logic.set_viewer_scene('prize', 'BẢNG TIỀN THƯỞNG', 'Các mốc giải thưởng của chương trình')
+        server_logic.set_viewer_scene('prize', 'BẢNG TIỀN THƯỞNG', 'Các mốc giải thưởng của chương trình', sound='viewer_prize')
         self.log("Viewer: hiện bảng tiền thưởng.")
 
     def show_break_scene(self):
@@ -335,6 +335,8 @@ class HostGUI(tk.Tk):
             'GIẢI LAO',
             'Chương trình sẽ quay lại sau ít phút',
             countdown_seconds=300,
+            sound='viewer_break',
+            sound_loop=True,
         )
         self.log("Viewer: màn nghỉ 5 phút.")
 
@@ -343,11 +345,13 @@ class HostGUI(tk.Tk):
             'technical',
             'TECHNICAL STANDBY',
             'Chương trình tạm dừng trong ít phút',
+            sound='viewer_technical',
+            sound_loop=True,
         )
         self.log("Viewer: technical standby.")
 
     def show_blank_scene(self):
-        server_logic.set_viewer_scene('blank', '', '')
+        server_logic.set_viewer_scene('blank', '', '', sound='viewer_blank')
         self.log("Viewer: blank screen.")
 
     def reset_viewers(self):
@@ -359,6 +363,7 @@ class HostGUI(tk.Tk):
             'stats',
             'THỐNG KÊ LƯỢT CHƠI',
             'Tổng hợp nhanh diễn biến hiện tại',
+            sound='viewer_stats',
         )
         self.log("Viewer: hiện stats.")
 
@@ -367,6 +372,8 @@ class HostGUI(tk.Tk):
             'credits',
             'AI LÀ TRIỆU PHÚ',
             'MC, thí sinh, khán giả và đội kỹ thuật',
+            sound='viewer_credits',
+            sound_loop=True,
         )
         self.log("Viewer: hiện credit/sponsor slide.")
 
@@ -381,6 +388,7 @@ class HostGUI(tk.Tk):
             'mini_quiz',
             'MINI QUIZ KHÁN GIẢ',
             random.choice(prompts),
+            sound='viewer_mini_quiz',
         )
         self.log("Viewer: hiện mini quiz.")
 
@@ -390,6 +398,7 @@ class HostGUI(tk.Tk):
             'DỰ ĐOÁN KHÁN GIẢ',
             'Thí sinh sẽ trả lời đúng câu này chứ?',
             payload={'choices': ['Sẽ đúng', 'Có thể sai', 'Cần trợ giúp']},
+            sound='viewer_poll',
         )
         self.log("Viewer: hiện poll dự đoán.")
 
@@ -500,7 +509,11 @@ class HostGUI(tk.Tk):
             self.handle_audience_request()
 
     def handle_audience_request(self):
-        self.log("Đang chờ nhập ý kiến 3 khán giả trong 60 giây...")
+        self.log("Chờ 2 giây cho nhạc hiệu hỏi khán giả, sau đó mở bộ đếm 30 giây...")
+        self.after(2000, self.open_audience_dialog)
+
+    def open_audience_dialog(self):
+        self.log("Đang nhập ý kiến 3 khán giả trong 30 giây...")
         dialog = AudienceDialog(self)
         results = dialog.result
         if results and all(r.upper() in ['A', 'B', 'C', 'D'] for r in results if r):
@@ -531,7 +544,7 @@ class HostGUI(tk.Tk):
 class AudienceDialog(simpledialog.Dialog):
     def body(self, master):
         self.title("Hỏi Ý Kiến Khán Giả")
-        self.remaining_seconds = 60
+        self.remaining_seconds = 30
         self.timer_job = None
         tk.Label(master, text="Nhập câu trả lời của 3 khán giả may mắn:").pack()
         self.timer_label = tk.Label(master, text="", fg="red", font=("Segoe UI", 10, "bold"))

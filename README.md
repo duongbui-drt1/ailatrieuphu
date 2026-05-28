@@ -30,11 +30,24 @@ audio/
   wait_6_10.mp3
   wait_11_15.mp3
   lifeline.mp3
+  lifeline_click.wav hoặc lifeline_click.mp3
   lifeline_5050.mp3 hoặc lifeline_5050.wav
   audience_countdown.mp3 hoặc audience_countdown.wav
+  lifeline_call.mp3 hoặc lifeline_call.wav
   lifeline_wise_man.mp3 hoặc lifeline_wise_man.wav
   win.mp3
   complete.mp3 hoặc complete.wav
+  program_end.mp3 hoặc program_end.wav
+  end_buzzer.wav hoặc end_buzzer.mp3
+  viewer_game.mp3 hoặc viewer_game.wav
+  viewer_prize.mp3 hoặc viewer_prize.wav
+  viewer_break.mp3 hoặc viewer_break.wav
+  viewer_technical.mp3 hoặc viewer_technical.wav
+  viewer_blank.wav hoặc viewer_blank.mp3
+  viewer_stats.mp3 hoặc viewer_stats.wav
+  viewer_credits.mp3 hoặc viewer_credits.wav
+  viewer_mini_quiz.mp3 hoặc viewer_mini_quiz.wav
+  viewer_poll.mp3 hoặc viewer_poll.wav
   selected.wav
   correct.wav
   wrong.wav
@@ -99,7 +112,8 @@ Host mở `host_gui.py`, thí sinh mở `client_gui.py`, khán giả mở `viewe
 - Từ câu 1 đến câu 5, đáp án được công bố tự động sau khi thí sinh chọn.
 - Từ câu 6 trở đi, thí sinh chọn đáp án trước, viewer thấy đáp án đó ngay, nhưng host phải bấm `Công bố đáp án` để reveal đúng/sai.
 - Trợ giúp `Gọi Điện` chỉ còn độ tin cậy 50/50.
-- Trợ giúp `Khán Giả` có giới hạn 60 giây trên bảng host; hết giờ sẽ tự chốt dữ liệu đang nhập.
+- Mỗi lần bấm trợ giúp sẽ chạy hiệu ứng âm thanh trước, sau 5 giây mới mở/trả kết quả trợ giúp.
+- Trợ giúp `Khán Giả` có giới hạn 30 giây trên bảng host, mở sau 2 giây để nhạc hiệu chạy hết nốt; hết giờ sẽ tự chốt dữ liệu đang nhập.
 
 ## Scene Và Phím Điều Khiển
 
@@ -107,20 +121,22 @@ Ghi chú cập nhật:
 
 - Từ câu 1 đến câu 5, game tự chạy liên tục, không hiện nút sẵn sàng giữa các câu.
 - Từ câu 6 trở đi mới giữ bước xác nhận sẵn sàng và host có thể bấm `Bắt đầu câu` nếu client bị đơ phím.
+- Cây tiền thưởng hiện theo mốc 2026: cao nhất `500.000.000 VNĐ`, mốc an toàn sau câu 5 là `5.000.000 VNĐ`, sau câu 10 là `22.000.000 VNĐ`.
 - Trợ giúp `Tư Vấn` gợi ý theo xác suất 50/50 thay vì luôn đúng.
-- Nếu thí sinh sai từ câu 10 trở đi, màn kết thúc hiển thị mức nhận được mặc định `2.000.000 VNĐ`; trước câu 10 hiển thị đúng số tiền đã qua.
+- Nếu trả lời sai ở câu 1-5 nhận `0 VNĐ`, câu 6-10 nhận `5.000.000 VNĐ`, câu 11-15 nhận `22.000.000 VNĐ`.
 - Màn kết thúc không dùng popup thắng/thua nữa, mà hiện trực tiếp tên thí sinh và số tiền nhận được.
 
 Host có thêm các scene cho viewer:
 
-- `Game`: quay lại câu hỏi hiện tại.
-- `Bảng thưởng`: hiện bảng tiền thưởng.
-- `Nghỉ 5 phút`: màn giải lao có countdown.
-- `Technical`: màn chờ kỹ thuật.
-- `Blank`: màn đen khẩn cấp.
-- `Stats`: thống kê lượt chơi hiện tại.
-- `Credits`: slide credit/sponsor.
-- `Mini quiz` và `Poll`: nội dung tương tác nhẹ cho khán giả lúc nghỉ.
+- `Game`: quay lại câu hỏi hiện tại, đề xuất `viewer_game.wav` là một sting ngắn.
+- `Bảng thưởng`: hiện bảng tiền thưởng, đề xuất `viewer_prize.mp3` là nhạc bảng tiền.
+- `Nghỉ 5 phút`: màn giải lao có countdown, đề xuất `viewer_break.mp3` là nhạc chờ loop.
+- `Technical`: màn chờ kỹ thuật, đề xuất `viewer_technical.mp3` là nhạc nền nhẹ loop.
+- `Blank`: màn đen khẩn cấp, đề xuất `viewer_blank.wav` là tiếng cắt tín hiệu ngắn.
+- `Stats`: thống kê lượt chơi hiện tại, đề xuất `viewer_stats.wav` là sting dữ liệu ngắn.
+- `Credits`: slide credit/sponsor, đề xuất `viewer_credits.mp3` là nhạc credit loop.
+- `Mini quiz`: nội dung tương tác nhẹ, đề xuất `viewer_mini_quiz.wav`.
+- `Poll`: dự đoán khán giả, đề xuất `viewer_poll.wav`.
 
 Host có thêm nút kỹ thuật:
 
