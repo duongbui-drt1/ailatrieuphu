@@ -3,9 +3,8 @@ import json
 import threading
 import tkinter as tk
 from tkinter import simpledialog, messagebox
-import os
 try:
-    from PIL import Image, ImageTk, ImageDraw
+    from ui_assets import load_background_source, load_button_images, load_logo_photo, render_background
 except ImportError:
     messagebox.showerror("Thiếu thư viện", "Vui lòng cài đặt: pip install Pillow")
     exit()
@@ -20,13 +19,23 @@ PRIZE_LEVELS = [
 ]
 
 # Màu sắc (giống hệt client)
-GRADIENT_START = "#1a237e"
-GRADIENT_END = "#0d1b2a"
-WIDGET_BG = "#1a237e"
+GRADIENT_START = "#081d4f"
+GRADIENT_END = "#030712"
+WIDGET_BG = "#07143a"
+PANEL_BG = "#091b4d"
+PANEL_BORDER = "#d7b75a"
+TEXT_MUTED = "#aebbe8"
 MILESTONE_COLOR = "#f39c12"
 CURRENT_COLOR = "#f1c40f"
 DEFAULT_PRIZE_COLOR = "#3498db"
 PASSED_PRIZE_COLOR = "#7f8c8d"
+ANSWER_STYLES = {
+    "normal": {"bg": "#102a73", "fg": "#ffffff", "border": "#d7b75a"},
+    "selected": {"bg": "#d7b75a", "fg": "#06122f", "border": "#fff3b0"},
+    "correct": {"bg": "#12805a", "fg": "#ffffff", "border": "#8ff0c5"},
+    "wrong": {"bg": "#8b1f36", "fg": "#ffffff", "border": "#ff9caf"},
+    "dim": {"bg": "#24304c", "fg": "#93a4cf", "border": "#3d4b70"},
+}
 
 class ViewerGUI(tk.Tk):
     def __init__(self):
@@ -34,24 +43,24 @@ class ViewerGUI(tk.Tk):
         self.title("Chế độ Khán giả - Ai Là Triệu Phú")
         self.geometry("1280x720")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
-        
+
         self.viewer_socket = None
         self.current_level = 0
-        
+        self.scene_countdown_job = None
+        self.scene_remaining_seconds = 0
+        self.final_scene_active = False
+
         self.load_assets()
         self.create_widgets()
-        
+
         self.after(100, self.prompt_for_ip)
 
     def load_assets(self):
         """Tải các tài nguyên hình ảnh cần thiết cho giao diện."""
         try:
-            self.btn_images = {
-                'normal': ImageTk.PhotoImage(Image.open("images/button_normal.png").resize((450, 60))),
-                'selected': ImageTk.PhotoImage(Image.open("images/button_selected.png").resize((450, 60))),
-                'correct': ImageTk.PhotoImage(Image.open("images/button_correct.png").resize((450, 60))),
-                'wrong': ImageTk.PhotoImage(Image.open("images/button_wrong.png").resize((450, 60)))
-            }
+            self.background_source = load_background_source()
+            self.btn_images = load_button_images((450, 60))
+            self.logo_image = load_logo_photo((72, 72))
         except Exception as e:
             messagebox.showerror("Lỗi Tải Ảnh", f"Không thể tải ảnh: {e}")
             self.destroy()
@@ -62,44 +71,153 @@ class ViewerGUI(tk.Tk):
         self.canvas.pack(fill="both", expand=True)
         self.canvas.bind("<Configure>", self.draw_gradient)
 
-        self.status_bar = tk.Label(self, text="...", bd=1, relief=tk.SUNKEN, anchor=tk.W, fg="white", bg="#0d1b2a")
+        self.status_bar = tk.Label(
+            self,
+            text="...",
+            bd=0,
+            anchor=tk.W,
+            fg=TEXT_MUTED,
+            bg="#020817",
+            font=("Segoe UI", 10),
+            padx=14,
+            pady=5,
+        )
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
-        # Bảng giải thưởng bên phải
-        prize_frame = tk.Frame(self.canvas, bg=WIDGET_BG)
+        prize_frame = tk.Frame(self.canvas, bg="#050b23", highlightthickness=1, highlightbackground="#243b78")
         prize_frame.place(relx=0.75, rely=0, relwidth=0.25, relheight=1)
+
+        tk.Label(
+            prize_frame,
+            text="MỐC THƯỞNG",
+            font=("Segoe UI", 15, "bold"),
+            fg=PANEL_BORDER,
+            bg="#050b23",
+            anchor="w",
+        ).pack(fill='x', padx=20, pady=(18, 10))
+
         self.prize_labels = []
         for i, prize in enumerate(PRIZE_LEVELS):
-            label = tk.Label(prize_frame, text=f"{15 - i:2d} ♦ {prize}", font=("Arial", 14, "bold"), bg=WIDGET_BG, fg="white", anchor='w')
-            label.pack(fill='x', padx=20, pady=3)
+            label = tk.Label(prize_frame, text=f"{15 - i:2d} ♦ {prize}", font=("Segoe UI", 13, "bold"), bg="#050b23", fg="white", anchor='w')
+            label.pack(fill='x', padx=20, pady=2)
             self.prize_labels.append(label)
 
-        # Khung chính
         main_frame = tk.Frame(self.canvas, bg=WIDGET_BG)
         main_frame.place(relx=0, rely=0, relwidth=0.75, relheight=1)
 
-        # Khu vực game
-        self.game_area = tk.Frame(main_frame, bg=WIDGET_BG)
-        self.lbl_question = tk.Label(self.game_area, text="...", font=("Arial", 20, "bold"), fg="white", bg=WIDGET_BG, wraplength=800)
-        self.lbl_question.place(relx=0.5, rely=0.3, anchor=tk.CENTER, width=900, height=120)
+        header_frame = tk.Frame(main_frame, bg=WIDGET_BG)
+        header_frame.place(relx=0.04, rely=0.035, relwidth=0.92, height=88)
 
-        # Các nút đáp án
+        if self.logo_image:
+            tk.Label(header_frame, image=self.logo_image, bg=WIDGET_BG).pack(side=tk.LEFT, padx=(0, 14))
+
+        title_frame = tk.Frame(header_frame, bg=WIDGET_BG)
+        title_frame.pack(side=tk.LEFT, fill="both", expand=True)
+        tk.Label(
+            title_frame,
+            text="KHÁN GIẢ TRỰC TIẾP",
+            font=("Segoe UI", 25, "bold"),
+            fg="white",
+            bg=WIDGET_BG,
+            anchor="w",
+        ).pack(fill="x")
+        tk.Label(
+            title_frame,
+            text="Sân khấu Ai Là Triệu Phú",
+            font=("Segoe UI", 12),
+            fg=TEXT_MUTED,
+            bg=WIDGET_BG,
+            anchor="w",
+        ).pack(fill="x", pady=(2, 0))
+
+        self.game_area = tk.Frame(main_frame, bg=WIDGET_BG)
+        self.lbl_question = tk.Label(
+            self.game_area,
+            text="...",
+            font=("Arial", 20, "bold"),
+            fg="white",
+            bg=PANEL_BG,
+            wraplength=820,
+            justify=tk.CENTER,
+            highlightthickness=2,
+            highlightbackground=PANEL_BORDER,
+            padx=24,
+            pady=18,
+        )
+        self.lbl_question.place(relx=0.5, rely=0.26, anchor=tk.CENTER, width=880, height=135)
+
         self.option_buttons = {}
         self.option_positions = {}
-        positions = [(0.25, 0.55), (0.75, 0.55), (0.25, 0.75), (0.75, 0.75)]
+        positions = [(0.25, 0.58), (0.75, 0.58), (0.25, 0.79), (0.75, 0.79)]
         for i, option in enumerate(["A", "B", "C", "D"]):
             relx, rely = positions[i]
-            btn = tk.Button(self.game_area, image=self.btn_images['normal'], font=("Arial", 14, "bold"), fg="white", bd=0, highlightthickness=0, compound=tk.CENTER, state="disabled")
-            btn.configure(bg=WIDGET_BG)
-            btn.place(relx=relx, rely=rely, anchor=tk.CENTER)
+            btn = tk.Label(
+                self.game_area,
+                text=f"{option}:",
+                font=("Segoe UI", 17, "bold"),
+                fg="white",
+                bg=ANSWER_STYLES["normal"]["bg"],
+                bd=0,
+                highlightthickness=2,
+                highlightbackground=ANSWER_STYLES["normal"]["border"],
+                anchor="w",
+                justify=tk.LEFT,
+                wraplength=390,
+                padx=18,
+                pady=10,
+            )
+            btn.place(relx=relx, rely=rely, anchor=tk.CENTER, width=430, height=82)
             self.option_buttons[option] = btn
             self.option_positions[option] = {'relx': relx, 'rely': rely}
 
-        # Lớp phủ cho các thông báo
-        self.overlay_frame = tk.Frame(main_frame, bg=WIDGET_BG)
-        self.overlay_label = tk.Label(self.overlay_frame, font=("Arial", 24, "bold"), fg="white", bg=WIDGET_BG)
+        self.overlay_frame = tk.Frame(
+            main_frame,
+            bg=PANEL_BG,
+            highlightthickness=2,
+            highlightbackground=PANEL_BORDER,
+            padx=36,
+            pady=28,
+        )
+        self.overlay_label = tk.Label(
+            self.overlay_frame,
+            font=("Arial", 24, "bold"),
+            fg="white",
+            bg=PANEL_BG,
+            wraplength=680,
+            justify=tk.CENTER,
+        )
         self.overlay_label.pack(pady=20)
-        
+
+        self.scene_frame = tk.Frame(self.canvas, bg="#020817")
+        self.scene_title = tk.Label(
+            self.scene_frame,
+            text="",
+            bg="#020817",
+            fg=PANEL_BORDER,
+            font=("Segoe UI", 34, "bold"),
+            wraplength=980,
+            justify=tk.CENTER,
+        )
+        self.scene_title.pack(expand=True, fill="both", pady=(90, 0))
+        self.scene_message = tk.Label(
+            self.scene_frame,
+            text="",
+            bg="#020817",
+            fg="white",
+            font=("Segoe UI", 22),
+            wraplength=980,
+            justify=tk.CENTER,
+        )
+        self.scene_message.pack(fill="x", padx=80)
+        self.scene_countdown = tk.Label(
+            self.scene_frame,
+            text="",
+            bg="#020817",
+            fg=PANEL_BORDER,
+            font=("Segoe UI", 42, "bold"),
+        )
+        self.scene_countdown.pack(pady=(28, 80))
+
         self.show_overlay("Đang chờ kết nối tới server...")
 
     def draw_gradient(self, event):
@@ -108,29 +226,124 @@ class ViewerGUI(tk.Tk):
         width, height = event.width, event.height
         if width <= 0 or height <= 0: return
 
-        image = Image.new("RGB", (width, height), GRADIENT_END)
-        draw = ImageDraw.Draw(image)
-        start_rgb = tuple(int(GRADIENT_START.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
-        end_rgb = tuple(int(GRADIENT_END.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
-        
-        for i in range(height):
-            r, g, b = [int(start_rgb[j] + (end_rgb[j] - start_rgb[j]) * (i / height)) for j in range(3)]
-            draw.line([(0, i), (width, i)], fill=(r, g, b))
-            
-        self.gradient_image = ImageTk.PhotoImage(image)
+        self.gradient_image = render_background(
+            self.background_source,
+            (width, height),
+            GRADIENT_START,
+            GRADIENT_END,
+        )
         self.canvas.create_image(0, 0, image=self.gradient_image, anchor="nw", tags="gradient")
         self.canvas.tag_lower("gradient")
 
     def show_overlay(self, message):
         """Hiển thị một lớp phủ với thông báo."""
+        self.hide_scene()
         self.game_area.place_forget()
         self.overlay_label.config(text=message)
         self.overlay_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
     def hide_overlay(self):
         """Ẩn lớp phủ và hiển thị khu vực game."""
+        self.hide_scene()
         self.overlay_frame.place_forget()
-        self.game_area.place(relx=0.5, rely=0.5, anchor=tk.CENTER, relwidth=1, relheight=0.8)
+        self.game_area.place(relx=0.5, rely=0.58, anchor=tk.CENTER, relwidth=1, relheight=0.74)
+
+    def place_answer_button(self, option):
+        pos = self.option_positions[option]
+        self.option_buttons[option].place(
+            relx=pos['relx'],
+            rely=pos['rely'],
+            anchor=tk.CENTER,
+            width=430,
+            height=82,
+        )
+
+    def style_answer_button(self, option, state):
+        style = ANSWER_STYLES[state]
+        self.option_buttons[option].config(
+            bg=style["bg"],
+            fg=style["fg"],
+            highlightbackground=style["border"],
+        )
+
+    def hide_scene(self):
+        if self.scene_countdown_job:
+            self.after_cancel(self.scene_countdown_job)
+            self.scene_countdown_job = None
+        self.scene_frame.place_forget()
+
+    def show_viewer_scene(self, data):
+        scene = data.get('scene', 'standby')
+        title = data.get('title', '')
+        message = data.get('message', '')
+        payload = data.get('payload', {})
+        stats = data.get('stats', {})
+
+        if scene == 'game':
+            self.hide_overlay()
+            return
+        if scene == 'blank':
+            title, message = "", ""
+            self.scene_frame.config(bg="black")
+            self.scene_title.config(bg="black", fg="black")
+            self.scene_message.config(bg="black", fg="black")
+            self.scene_countdown.config(bg="black", fg="black")
+        else:
+            self.scene_frame.config(bg="#020817")
+            self.scene_title.config(bg="#020817", fg=PANEL_BORDER)
+            self.scene_message.config(bg="#020817", fg="white")
+            self.scene_countdown.config(bg="#020817", fg=PANEL_BORDER)
+
+        if scene == 'prize':
+            message = self.prize_scene_text()
+        elif scene == 'stats':
+            fastest = stats.get('fastest_ping')
+            fastest_text = f"{fastest:.0f}ms" if fastest is not None else "N/A"
+            message = (
+                f"Câu đã lên sóng: {stats.get('questions_seen', 0)}\n"
+                f"Trả lời đúng: {stats.get('correct_answers', 0)} | Sai: {stats.get('wrong_answers', 0)}\n"
+                f"Trợ giúp đã dùng: {stats.get('lifelines_used', 0)}\n"
+                f"Thời gian phản hồi nhanh nhất: {fastest_text}"
+            )
+        elif scene == 'credits':
+            message = "MC • Thí sinh • Khán giả • Đội kỹ thuật\nDuli Production DLV"
+        elif scene == 'poll':
+            choices = payload.get('choices', [])
+            message = message + "\n\n" + "   ".join(choices)
+        elif scene == 'mini_quiz':
+            message = message + "\n\nHãy giữ câu trả lời của bạn cho phần quay lại."
+
+        self.game_area.place_forget()
+        self.overlay_frame.place_forget()
+        self.scene_title.config(text=title)
+        self.scene_message.config(text=message)
+        self.scene_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self.scene_frame.tkraise()
+        self.start_scene_countdown(data.get('countdown_seconds', 0))
+
+    def prize_scene_text(self):
+        lines = []
+        for index, prize in enumerate(PRIZE_LEVELS):
+            level = 15 - index
+            marker = "▶" if level == self.current_level else " "
+            lines.append(f"{marker} {level:02d}  {prize} VNĐ")
+        return "\n".join(lines)
+
+    def start_scene_countdown(self, seconds):
+        if self.scene_countdown_job:
+            self.after_cancel(self.scene_countdown_job)
+            self.scene_countdown_job = None
+        self.scene_remaining_seconds = int(seconds or 0)
+        self.update_scene_countdown()
+
+    def update_scene_countdown(self):
+        if self.scene_remaining_seconds <= 0:
+            self.scene_countdown.config(text="")
+            return
+        minutes, seconds = divmod(self.scene_remaining_seconds, 60)
+        self.scene_countdown.config(text=f"{minutes:02d}:{seconds:02d}")
+        self.scene_remaining_seconds -= 1
+        self.scene_countdown_job = self.after(1000, self.update_scene_countdown)
 
     def prompt_for_ip(self):
         """Hỏi IP server và bắt đầu kết nối."""
@@ -138,7 +351,7 @@ class ViewerGUI(tk.Tk):
         if not server_ip:
             self.destroy()
             return
-        
+
         self.status_bar.config(text=f"Đang kết nối tới {server_ip}...")
         threading.Thread(target=self._connect_in_thread, args=(server_ip,), daemon=True).start()
 
@@ -147,11 +360,11 @@ class ViewerGUI(tk.Tk):
         try:
             self.viewer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.viewer_socket.connect((server_ip, PORT))
-            
+
             # Gửi thông tin định danh là viewer
             viewer_info = {'type': 'viewer'}
             self.viewer_socket.sendall((json.dumps(viewer_info) + '\n').encode('utf-8'))
-            
+
             self.after(0, lambda: self.title(f"Chế độ Khán giả - Đã kết nối tới {server_ip}"))
             self.after(0, lambda: self.status_bar.config(text=f"Đã kết nối. Đang chờ game bắt đầu..."))
             self.after(0, lambda: self.show_overlay("Đang chờ người chơi bắt đầu..."))
@@ -161,7 +374,7 @@ class ViewerGUI(tk.Tk):
         except Exception as e:
             self.after(0, lambda: messagebox.showerror("Lỗi Kết Nối", f"Không thể kết nối: {e}"))
             self.after(0, self.destroy)
-    
+
     def listen_for_messages(self):
         """Lắng nghe tin nhắn từ server."""
         buffer = ""
@@ -170,7 +383,7 @@ class ViewerGUI(tk.Tk):
                 raw_data = self.viewer_socket.recv(BUFFER_SIZE)
                 if not raw_data:
                     break
-                
+
                 buffer += raw_data.decode('utf-8')
                 while '\n' in buffer:
                     message, buffer = buffer.split('\n', 1)
@@ -182,7 +395,7 @@ class ViewerGUI(tk.Tk):
     def process_message(self, data):
         """Xử lý tin nhắn nhận được từ server."""
         msg_type = data.get('type')
-        
+
         if msg_type == 'ask_ready':
             self.show_overlay(f"Đang chờ người chơi sẵn sàng cho câu {data['level']}...")
             self.update_prize_display(data['level'])
@@ -191,34 +404,48 @@ class ViewerGUI(tk.Tk):
             self.update_question_display(data)
         elif msg_type == 'lifeline_result':
             self.handle_lifeline_result(data)
+        elif msg_type == 'answer_locked':
+            self.show_locked_answer(data)
+        elif msg_type == 'answer_unlocked':
+            self.unlock_answer_display(data)
         elif msg_type == 'result':
             self.show_answer_result(data)
+        elif msg_type == 'viewer_scene':
+            self.show_viewer_scene(data)
+        elif msg_type == 'viewer_reset':
+            self.reset_ui_for_new_game()
         elif msg_type == 'game_paused':
             if data.get('paused', False):
                 self.show_overlay("GAME TẠM DỪNG BỞI HOST")
             else:
                 self.hide_overlay()
-        elif msg_type in ['win', 'game_over', 'game_ended_waiting']:
-            self.reset_ui_for_new_game()
-
+        elif msg_type == 'win':
+            self.show_final_scene(data, True)
+        elif msg_type == 'game_over':
+            self.show_final_scene(data, False)
+        elif msg_type == 'game_ended_waiting':
+            if not self.final_scene_active:
+                self.reset_ui_for_new_game()
     def update_question_display(self, data):
         """Cập nhật giao diện với câu hỏi và các lựa chọn mới."""
+        self.final_scene_active = False
         self.current_level = data['level']
-        self.lbl_question.config(text=f"Câu {self.current_level}: {data['question']}")
-        
+        self.lbl_question.config(text=f"CÂU {self.current_level} - {data['prize']} VNĐ\n{data['question']}")
+
         for option, btn in self.option_buttons.items():
-            pos = self.option_positions[option]
-            btn.place(relx=pos['relx'], rely=pos['rely'], anchor=tk.CENTER)
-            btn.config(text=f"{option}: {data['options'][option]}", image=self.btn_images['normal'])
-            
+            self.place_answer_button(option)
+            btn.config(text=f"{option}: {data['options'][option]}")
+            self.style_answer_button(option, "normal")
+
         self.update_prize_display(self.current_level)
+        self.status_bar.config(text=f"Đang chờ thí sinh trả lời câu {self.current_level}...")
 
     def update_prize_display(self, current_level):
         """Cập nhật màu sắc của bảng giải thưởng."""
         for i, label in enumerate(self.prize_labels):
             prize_level = 15 - i
             is_milestone = prize_level in [5, 10, 15]
-            
+
             if prize_level < current_level:
                 label.config(bg=WIDGET_BG, fg=PASSED_PRIZE_COLOR)
             elif prize_level == current_level:
@@ -234,41 +461,75 @@ class ViewerGUI(tk.Tk):
                 if not data['options'].get(option):
                     btn.place_forget()
 
+    def show_locked_answer(self, data):
+        """Hiển thị ngay đáp án thí sinh vừa chốt, trước khi công bố đúng/sai."""
+        player_answer = data.get('player_answer')
+        if not player_answer or player_answer not in self.option_buttons:
+            return
+
+        for key, btn in self.option_buttons.items():
+            if btn.winfo_ismapped():
+                self.style_answer_button(key, "selected" if key == player_answer else "normal")
+
+        if data.get('requires_host_confirm'):
+            self.status_bar.config(text=f"Thí sinh đã chọn {player_answer}. Chờ MC công bố đáp án...")
+        else:
+            self.status_bar.config(text=f"Thí sinh đã chọn {player_answer}.")
+
+    def unlock_answer_display(self, data):
+        if data.get('level') != self.current_level:
+            return
+        for key, btn in self.option_buttons.items():
+            if btn.winfo_ismapped():
+                self.style_answer_button(key, "normal")
+        self.status_bar.config(text="Host đã hủy chốt đáp án. Chờ thí sinh chọn lại.")
+
     def show_answer_result(self, data):
         """Hiển thị kết quả trả lời của người chơi."""
         player_answer = data.get('player_answer')
         correct_answer = data.get('correct_answer')
-        
+
         # Đánh dấu câu trả lời của người chơi
         if player_answer and player_answer in self.option_buttons:
-            self.option_buttons[player_answer].config(image=self.btn_images['selected'])
-        
-        # Sau một khoảng trễ, hiển thị đáp án đúng/sai
-        def final_result():
-            for key, btn in self.option_buttons.items():
-                if btn.winfo_ismapped(): # Chỉ cập nhật các nút còn hiển thị
-                    if key == correct_answer:
-                        btn.config(image=self.btn_images['correct'])
-                    else:
-                        btn.config(image=self.btn_images['wrong'])
-        self.after(1500, final_result)
+            self.style_answer_button(player_answer, "selected")
+
+        for key, btn in self.option_buttons.items():
+            if btn.winfo_ismapped():
+                if key == correct_answer:
+                    self.style_answer_button(key, "correct")
+                else:
+                    self.style_answer_button(key, "wrong" if key == player_answer else "dim")
+
+        status = "đúng" if data.get('correct') else "sai"
+        self.status_bar.config(text=f"Công bố: thí sinh trả lời {status}. Đáp án đúng: {correct_answer}.")
+
+    def show_final_scene(self, data, is_win):
+        self.final_scene_active = True
+        player_name = data.get('player_name', 'Thí sinh')
+        prize = data.get('prize', '0')
+        title = "CHÚC MỪNG HOÀN THÀNH PHẦN THI" if is_win else "PHẦN THI KẾT THÚC"
+        self.show_overlay(f"{title}\n\n{player_name}\nSố tiền nhận được: {prize} VNĐ")
+        self.status_bar.config(text=f"Kết thúc lượt chơi. Số tiền nhận được: {prize} VNĐ")
 
     def reset_ui_for_new_game(self):
         """Reset giao diện để chờ lượt chơi mới."""
+        self.final_scene_active = False
         self.show_overlay("Lượt chơi đã kết thúc. Chờ người chơi mới...")
         self.current_level = 0
         self.update_prize_display(0)
-        
+
         # Đảm bảo tất cả các nút đáp án được hiển thị lại
         for option, btn in self.option_buttons.items():
-            pos = self.option_positions[option]
-            btn.place(relx=pos['relx'], rely=pos['rely'], anchor=tk.CENTER)
-            btn.config(text=f"{option}:", image=self.btn_images['normal'])
+            self.place_answer_button(option)
+            btn.config(text=f"{option}:")
+            self.style_answer_button(option, "normal")
 
     def handle_disconnection(self):
         """Xử lý khi mất kết nối tới server."""
         if self.viewer_socket:
             self.viewer_socket = None
+            if self.final_scene_active:
+                return
             messagebox.showinfo("Mất kết nối", "Mất kết nối tới server.")
             self.destroy()
 
