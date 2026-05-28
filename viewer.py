@@ -50,6 +50,8 @@ class ViewerGUI(tk.Tk):
         self.scene_countdown_job = None
         self.scene_remaining_seconds = 0
         self.final_scene_active = False
+        self.current_lifelines_state = {'5050': True, 'audience': True, 'call': True, 'wise_man': True}
+        self.credit_animation_job = None
         self.audio_manager = AudioManager()
 
         self.load_assets()
@@ -272,7 +274,16 @@ class ViewerGUI(tk.Tk):
         if self.scene_countdown_job:
             self.after_cancel(self.scene_countdown_job)
             self.scene_countdown_job = None
+        self.stop_credit_animation()
         self.scene_frame.place_forget()
+
+    def stop_credit_animation(self):
+        if self.credit_animation_job:
+            try:
+                self.after_cancel(self.credit_animation_job)
+            except tk.TclError:
+                pass
+            self.credit_animation_job = None
 
     def play_scene_audio(self, sound_name, loop=False):
         self.audio_manager.stop_all()
@@ -294,12 +305,57 @@ class ViewerGUI(tk.Tk):
         if self.audio_manager.has_sound('program_end'):
             self.audio_manager.play('program_end')
 
+    def credit_lines_from_payload(self, payload):
+        lines = payload.get('lines') or [
+            "Duli Production DLV",
+            "Đạo diễn chương trình: Duong Bui",
+            "Dẫn chương trình: MC",
+            "Thí sinh ghế nóng",
+            "Khán giả trường quay",
+            "Kỹ thuật hình ảnh - âm thanh - mạng LAN",
+            "Biên tập câu hỏi và kiểm duyệt nội dung",
+            "Cảm ơn mọi người đã theo dõi",
+        ]
+        return [line for line in lines if line]
+
+    def start_credit_animation(self, lines):
+        self.stop_credit_animation()
+        if not lines:
+            return
+
+        colors = [PANEL_BORDER, "#ffffff", "#8ff0c5"]
+
+        def animate(step=0):
+            window_size = min(6, len(lines))
+            start = step % len(lines)
+            visible = [lines[(start + offset) % len(lines)] for offset in range(window_size)]
+            formatted = []
+            for offset, line in enumerate(visible):
+                prefix = "◆" if offset == 0 else " "
+                formatted.append(f"{prefix} {line}")
+            self.scene_title.config(fg=colors[step % len(colors)])
+            self.scene_message.config(text="\n".join(formatted))
+            self.credit_animation_job = self.after(950, lambda: animate(step + 1))
+
+        animate()
+
     def show_viewer_scene(self, data):
         scene = data.get('scene', 'standby')
         title = data.get('title', '')
         message = data.get('message', '')
         payload = data.get('payload', {})
         stats = data.get('stats', {})
+        self.stop_credit_animation()
+        self.scene_title.config(font=("Segoe UI", 34, "bold"))
+        self.scene_message.config(font=("Segoe UI", 22), justify=tk.CENTER)
+        if scene in ['prize', 'credits']:
+            self.scene_title.pack_configure(expand=False, fill="x", pady=(42, 12))
+            self.scene_message.pack_configure(fill="both", expand=True, padx=130)
+            self.scene_countdown.pack_configure(pady=(8, 30))
+        else:
+            self.scene_title.pack_configure(expand=True, fill="both", pady=(90, 0))
+            self.scene_message.pack_configure(fill="x", expand=False, padx=80)
+            self.scene_countdown.pack_configure(pady=(28, 80))
 
         if scene == 'game':
             self.play_scene_audio(data.get('sound'), data.get('sound_loop', False))
@@ -319,6 +375,7 @@ class ViewerGUI(tk.Tk):
 
         if scene == 'prize':
             message = self.prize_scene_text()
+            self.scene_message.config(font=("Consolas", 18, "bold"), justify=tk.LEFT)
         elif scene == 'stats':
             fastest = stats.get('fastest_ping')
             fastest_text = f"{fastest:.0f}ms" if fastest is not None else "N/A"
@@ -329,7 +386,9 @@ class ViewerGUI(tk.Tk):
                 f"Thời gian phản hồi nhanh nhất: {fastest_text}"
             )
         elif scene == 'credits':
-            message = "MC • Thí sinh • Khán giả • Đội kỹ thuật\nDuli Production DLV"
+            message = "\n".join(self.credit_lines_from_payload(payload))
+            self.scene_title.config(font=("Segoe UI", 42, "bold"))
+            self.scene_message.config(font=("Segoe UI", 24, "bold"), justify=tk.CENTER)
         elif scene == 'poll':
             choices = payload.get('choices', [])
             message = message + "\n\n" + "   ".join(choices)
@@ -344,14 +403,37 @@ class ViewerGUI(tk.Tk):
         self.scene_frame.tkraise()
         self.start_scene_countdown(data.get('countdown_seconds', 0))
         self.play_scene_audio(data.get('sound'), data.get('sound_loop', False))
+        if scene == 'credits':
+            self.start_credit_animation(self.credit_lines_from_payload(payload))
 
     def prize_scene_text(self):
-        lines = []
+        lines = ["TRỢ GIÚP"]
+        lines.extend(self.lifeline_scene_lines())
+        lines.append("")
+        lines.append("CÂY TIỀN THƯỞNG")
         for index, prize in enumerate(PRIZE_LEVELS):
             level = 15 - index
             marker = "▶" if level == self.current_level else " "
-            lines.append(f"{marker} {level:02d}  {prize} VNĐ")
+            milestone = "◆" if level in [5, 10, 15] else "◇"
+            lines.append(f"{marker} {level:02d} {milestone} {prize:>11} VNĐ")
         return "\n".join(lines)
+
+    def lifeline_scene_lines(self):
+        labels = [
+            ("5050", "50:50"),
+            ("audience", "Khán giả"),
+            ("call", "Gọi điện"),
+            ("wise_man", "Tư vấn"),
+        ]
+        parts = []
+        for key, label in labels:
+            available = self.current_lifelines_state.get(key, True)
+            if key == "wise_man" and self.current_level < 6 and available:
+                status = "KHÓA"
+            else:
+                status = "OK" if available else "X"
+            parts.append(f"{label}: {status}")
+        return ["  " + "   ".join(parts)]
 
     def start_scene_countdown(self, seconds):
         if self.scene_countdown_job:
@@ -456,6 +538,7 @@ class ViewerGUI(tk.Tk):
         self.stop_scene_audio()
         self.final_scene_active = False
         self.current_level = data['level']
+        self.current_lifelines_state = data.get('lifelines', self.current_lifelines_state)
         self.lbl_question.config(text=f"CÂU {self.current_level} - {data['prize']} VNĐ\n{data['question']}")
 
         for option, btn in self.option_buttons.items():
@@ -486,6 +569,9 @@ class ViewerGUI(tk.Tk):
 
     def handle_lifeline_result(self, data):
         """Xử lý kết quả từ sự trợ giúp (chỉ hiển thị 50:50)."""
+        lifeline = data.get('lifeline')
+        if lifeline:
+            self.current_lifelines_state[lifeline] = False
         if data['lifeline'] == '5050' and 'options' in data:
             for option, btn in self.option_buttons.items():
                 if not data['options'].get(option):
@@ -548,6 +634,7 @@ class ViewerGUI(tk.Tk):
         self.stop_scene_audio()
         self.show_overlay("Lượt chơi đã kết thúc. Chờ người chơi mới...")
         self.current_level = 0
+        self.current_lifelines_state = {'5050': True, 'audience': True, 'call': True, 'wise_man': True}
         self.update_prize_display(0)
 
         # Đảm bảo tất cả các nút đáp án được hiển thị lại

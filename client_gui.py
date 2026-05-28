@@ -486,7 +486,8 @@ class GameClientGUI(tk.Toplevel):
             self.handle_game_over(data)
         elif msg_type == 'game_paused':
             if data['paused']:
-                self.show_overlay("GAME TẠM DỪNG BỞI HOST")
+                message = "CHƯƠNG TRÌNH ĐÃ KẾT THÚC\nClient đang ở chế độ tạm dừng." if data.get('reason') == 'program_end' else "GAME TẠM DỪNG BỞI HOST"
+                self.show_overlay(message)
                 self.audio_manager.stop_all()
             else:
                 self.hide_overlay()

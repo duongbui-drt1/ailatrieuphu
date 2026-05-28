@@ -166,6 +166,7 @@ class HostGUI(tk.Tk):
             ("Mini quiz", self.show_mini_quiz_scene),
             ("Poll", self.show_poll_scene),
         ])
+        self.create_control_button(control_frame, "Kết thúc chương trình", self.end_program, bg=HOST_RED).pack(fill="x", pady=(10, 5))
 
         self.add_group_label(control_frame, "KỸ THUẬT")
         self.create_button_row(control_frame, [
@@ -371,11 +372,17 @@ class HostGUI(tk.Tk):
         server_logic.set_viewer_scene(
             'credits',
             'AI LÀ TRIỆU PHÚ',
-            'MC, thí sinh, khán giả và đội kỹ thuật',
+            '',
+            payload={'lines': server_logic.CREDIT_LINES},
             sound='viewer_credits',
             sound_loop=True,
         )
         self.log("Viewer: hiện credit/sponsor slide.")
+
+    def end_program(self):
+        server_logic.end_program_from_host()
+        self.pause_button.config(text="Tiếp Tục Game", bg=HOST_GREEN, fg="white")
+        self.log("Đã kết thúc chương trình: client chuyển tạm dừng, viewer chuyển credit.")
 
     def show_mini_quiz_scene(self):
         prompts = [

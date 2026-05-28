@@ -45,6 +45,17 @@ waiting_for_ready_level = 0
 pending_answer = None
 pending_answer_level = 0
 
+CREDIT_LINES = [
+    "Duli Production DLV",
+    "Đạo diễn chương trình: Duong Bui",
+    "Dẫn chương trình: MC",
+    "Thí sinh ghế nóng",
+    "Khán giả trường quay",
+    "Kỹ thuật hình ảnh - âm thanh - mạng LAN",
+    "Biên tập câu hỏi và kiểm duyệt nội dung",
+    "Cảm ơn mọi người đã theo dõi",
+]
+
 def set_game_update_callback(callback):
     global game_update_callback
     game_update_callback = callback
@@ -175,6 +186,20 @@ def play_client_music_from_host(name):
 
 def stop_client_music_from_host():
     broadcast({'type': 'stop_music'})
+    return True
+
+def end_program_from_host():
+    global is_game_paused
+    is_game_paused = True
+    broadcast({'type': 'game_paused', 'paused': True, 'reason': 'program_end'})
+    set_viewer_scene(
+        'credits',
+        'AI LÀ TRIỆU PHÚ',
+        '',
+        payload={'lines': CREDIT_LINES, 'mode': 'program_end'},
+        sound='viewer_credits',
+        sound_loop=True,
+    )
     return True
 
 def get_current_question_snapshot():
