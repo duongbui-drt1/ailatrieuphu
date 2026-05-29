@@ -184,7 +184,7 @@ class ViewerGUI(tk.Tk):
                 bg=WIDGET_BG,
                 bd=0,
                 highlightthickness=0,
-                anchor="w",
+                anchor=tk.CENTER,
                 justify=tk.LEFT,
                 wraplength=390,
                 padx=18,
@@ -288,7 +288,7 @@ class ViewerGUI(tk.Tk):
         style = ANSWER_STYLES[state]
         self.option_buttons[option].config(
             image=self.answer_images.get(style.get("image", state), self.answer_images["normal"]),
-            bg=style["bg"],
+            bg=WIDGET_BG,
             fg=style["fg"],
             highlightbackground=style["border"],
         )

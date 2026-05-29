@@ -93,41 +93,49 @@ def _draw_lozenge(size, state="normal", radius=None, base=None):
     image = base or Image.new("RGBA", size, (0, 0, 0, 0))
     style = BUTTON_STYLES.get(state, BUTTON_STYLES["normal"])
     radius = radius if radius is not None else min(12, max(4, height // 4))
+    compact = height < 42
 
     mask = Image.new("L", size, 0)
     mask_draw = ImageDraw.Draw(mask)
-    mask_draw.rounded_rectangle((3, 3, width - 4, height - 4), radius=radius, fill=255)
+    mask_inset = 2 if compact else 3
+    mask_draw.rounded_rectangle(
+        (mask_inset, mask_inset, width - 1 - mask_inset, height - 1 - mask_inset),
+        radius=radius,
+        fill=255,
+    )
     gradient = _horizontal_center_gradient(width, height, style["edge"], style["center"])
     image.paste(gradient, (0, 0), mask)
 
     draw = ImageDraw.Draw(image)
     glow_rgb = _hex_to_rgb(style["glow"])
     outline_rgb = _hex_to_rgb(style["outline"])
-    for inset, alpha in [(0, 55), (2, 80)]:
+    glow_layers = [(0, 68)] if compact else [(0, 55), (2, 80)]
+    for inset, alpha in glow_layers:
         draw.rounded_rectangle(
             (inset, inset, width - 1 - inset, height - 1 - inset),
             radius=max(radius - inset, 2),
             outline=(*glow_rgb, alpha),
-            width=2,
+            width=1 if compact else 2,
         )
     draw.rounded_rectangle(
         (2, 2, width - 3, height - 3),
         radius=radius,
         outline=outline_rgb,
-        width=3,
+        width=2 if compact else 3,
     )
-    draw.rounded_rectangle(
-        (8, 8, width - 9, height // 2),
-        radius=radius // 2,
-        outline=(255, 255, 255, 48),
-        width=1,
-    )
-    draw.rounded_rectangle(
-        (10, height // 2, width - 11, height - 10),
-        radius=radius // 2,
-        outline=(0, 0, 0, 90),
-        width=1,
-    )
+    if not compact:
+        draw.rounded_rectangle(
+            (8, 8, width - 9, height // 2),
+            radius=radius // 2,
+            outline=(255, 255, 255, 48),
+            width=1,
+        )
+        draw.rounded_rectangle(
+            (10, height // 2, width - 11, height - 10),
+            radius=radius // 2,
+            outline=(0, 0, 0, 90),
+            width=1,
+        )
     return image
 
 
