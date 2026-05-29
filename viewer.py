@@ -4,7 +4,7 @@ import threading
 import tkinter as tk
 from tkinter import simpledialog, messagebox
 try:
-    from ui_assets import load_background_source, load_button_images, load_logo_photo, render_background
+    from ui_assets import load_background_source, load_button_images, load_logo_photo, load_lozenge_photo, render_background
 except ImportError:
     messagebox.showerror("Thiếu thư viện", "Vui lòng cài đặt: pip install Pillow")
     exit()
@@ -23,19 +23,19 @@ PRIZE_LEVELS = [
 GRADIENT_START = "#081d4f"
 GRADIENT_END = "#030712"
 WIDGET_BG = "#07143a"
-PANEL_BG = "#091b4d"
-PANEL_BORDER = "#d7b75a"
+PANEL_BG = "#0F254E"
+PANEL_BORDER = "#00D2FF"
 TEXT_MUTED = "#aebbe8"
 MILESTONE_COLOR = "#ffffff"
-CURRENT_COLOR = "#f1c40f"
-DEFAULT_PRIZE_COLOR = "#f39c12"
+CURRENT_COLOR = "#FF9900"
+DEFAULT_PRIZE_COLOR = "#FF9900"
 PASSED_PRIZE_COLOR = "#7f8c8d"
 ANSWER_STYLES = {
-    "normal": {"bg": "#102a73", "fg": "#ffffff", "border": "#d7b75a"},
-    "selected": {"bg": "#d7b75a", "fg": "#06122f", "border": "#fff3b0"},
-    "correct": {"bg": "#12805a", "fg": "#ffffff", "border": "#8ff0c5"},
+    "normal": {"bg": "#0F254E", "fg": "#ffffff", "border": "#00D2FF", "image": "normal"},
+    "selected": {"bg": "#FF9900", "fg": "#050E21", "border": "#FF9900", "image": "selected"},
+    "correct": {"bg": "#00CC44", "fg": "#031507", "border": "#00CC44", "image": "correct"},
     "wrong": {"bg": "#8b1f36", "fg": "#ffffff", "border": "#ff9caf"},
-    "dim": {"bg": "#24304c", "fg": "#93a4cf", "border": "#3d4b70"},
+    "dim": {"bg": "#24304c", "fg": "#93a4cf", "border": "#3d4b70", "image": "dim"},
 }
 
 class ViewerGUI(tk.Tk):
@@ -64,7 +64,15 @@ class ViewerGUI(tk.Tk):
         try:
             self.background_source = load_background_source()
             self.btn_images = load_button_images((450, 60))
+            self.answer_images = load_button_images((430, 82))
             self.logo_image = load_logo_photo((72, 72))
+            self.question_panel_image = load_lozenge_photo((880, 135), "normal", radius=18)
+            self.prize_row_images = {
+                "normal": load_lozenge_photo((300, 31), "normal", radius=7),
+                "milestone": load_lozenge_photo((300, 31), "milestone", radius=7),
+                "selected": load_lozenge_photo((300, 31), "selected", radius=7),
+                "dim": load_lozenge_photo((300, 31), "dim", radius=7),
+            }
         except Exception as e:
             messagebox.showerror("Lỗi Tải Ảnh", f"Không thể tải ảnh: {e}")
             self.destroy()
@@ -102,8 +110,18 @@ class ViewerGUI(tk.Tk):
 
         self.prize_labels = []
         for i, prize in enumerate(PRIZE_LEVELS):
-            label = tk.Label(prize_frame, text=f"{15 - i:2d} ♦ {prize}", font=("Segoe UI", 13, "bold"), bg="#050b23", fg="white", anchor='w')
-            label.pack(fill='x', padx=20, pady=2)
+            label = tk.Label(
+                prize_frame,
+                text=f"{15 - i:2d}  ♦  {prize}",
+                image=self.prize_row_images["normal"],
+                compound=tk.CENTER,
+                font=("Segoe UI", 12, "bold"),
+                bg="#050b23",
+                fg="white",
+                bd=0,
+                highlightthickness=0,
+            )
+            label.pack(fill='x', padx=14, pady=2)
             self.prize_labels.append(label)
 
         main_frame = tk.Frame(self.canvas, bg=WIDGET_BG)
@@ -138,13 +156,14 @@ class ViewerGUI(tk.Tk):
         self.lbl_question = tk.Label(
             self.game_area,
             text="...",
+            image=self.question_panel_image,
+            compound=tk.CENTER,
             font=("Arial", 20, "bold"),
             fg="white",
-            bg=PANEL_BG,
+            bg=WIDGET_BG,
             wraplength=820,
             justify=tk.CENTER,
-            highlightthickness=2,
-            highlightbackground=PANEL_BORDER,
+            highlightthickness=0,
             padx=24,
             pady=18,
         )
@@ -160,10 +179,11 @@ class ViewerGUI(tk.Tk):
                 text=f"{option}:",
                 font=("Segoe UI", 17, "bold"),
                 fg="white",
-                bg=ANSWER_STYLES["normal"]["bg"],
+                image=self.answer_images["normal"],
+                compound=tk.CENTER,
+                bg=WIDGET_BG,
                 bd=0,
-                highlightthickness=2,
-                highlightbackground=ANSWER_STYLES["normal"]["border"],
+                highlightthickness=0,
                 anchor="w",
                 justify=tk.LEFT,
                 wraplength=390,
@@ -267,6 +287,7 @@ class ViewerGUI(tk.Tk):
     def style_answer_button(self, option, state):
         style = ANSWER_STYLES[state]
         self.option_buttons[option].config(
+            image=self.answer_images.get(style.get("image", state), self.answer_images["normal"]),
             bg=style["bg"],
             fg=style["fg"],
             highlightbackground=style["border"],
@@ -383,15 +404,13 @@ class ViewerGUI(tk.Tk):
             self.scene_message.pack_forget()
         for child in self.prize_scene_frame.winfo_children():
             child.destroy()
+        self.scene_prize_row_images = []
 
         window_height = max(self.winfo_height(), 720)
         compact = window_height < 860
         lifeline_font = ("Segoe UI", 10 if compact else 12, "bold")
-        level_font = ("Consolas", 13 if compact else 16, "bold")
         prize_font = ("Consolas", 14 if compact else 17, "bold")
-        marker_font = ("Segoe UI", 11 if compact else 13, "bold")
         row_pady = 0 if compact else 1
-        label_pady = 1 if compact else 3
 
         lifeline_row = tk.Frame(self.prize_scene_frame, bg="#020817")
         lifeline_row.pack(fill="x", pady=(0, 7 if compact else 12))
@@ -418,22 +437,31 @@ class ViewerGUI(tk.Tk):
 
         board = tk.Frame(self.prize_scene_frame, bg="#020817")
         board.pack(fill="both", expand=True)
+        horizontal_pad = 110 if compact else 180
+        row_width = max(760, self.winfo_width() - (horizontal_pad * 2) - 30)
+        row_height = 29 if compact else 34
         for index, prize in enumerate(PRIZE_LEVELS):
             level = 15 - index
             is_current = level == self.current_level
             is_passed = level < self.current_level
             is_milestone = level in [5, 10, 15]
-            bg = CURRENT_COLOR if is_current else "#07143a"
+            image_state = "selected" if is_current else ("dim" if is_passed else ("milestone" if is_milestone else "normal"))
+            row_image = load_lozenge_photo((row_width, row_height), image_state, radius=7)
+            self.scene_prize_row_images.append(row_image)
             fg = "#06122f" if is_current else (PASSED_PRIZE_COLOR if is_passed else (MILESTONE_COLOR if is_milestone else DEFAULT_PRIZE_COLOR))
-            mark_fg = "#06122f" if is_current else (PANEL_BORDER if is_milestone else "#8bb4ff")
-            row = tk.Frame(board, bg=bg, highlightthickness=1, highlightbackground=PANEL_BORDER if is_current else "#1a2c61")
-            row.pack(fill="x", pady=row_pady)
-            tk.Label(row, text="▶" if is_current else " ", bg=bg, fg=fg, width=2, font=marker_font).pack(side=tk.LEFT)
-            tk.Label(row, text=f"{level:02d}", bg=bg, fg=fg, width=4, font=level_font).pack(side=tk.LEFT)
-            tk.Label(row, text="◆", bg=bg, fg=mark_fg, width=2, font=marker_font).pack(side=tk.LEFT)
-            tk.Label(row, text=f"{prize} VNĐ", bg=bg, fg=fg, font=prize_font, anchor="w").pack(side=tk.LEFT, fill="x", expand=True, padx=(8, 14), pady=label_pady)
+            row_text = f"{'▶' if is_current else ' '}   {level:02d}   ◆   {prize} VNĐ"
+            tk.Label(
+                board,
+                text=row_text,
+                image=row_image,
+                compound=tk.CENTER,
+                bg="#020817",
+                fg=fg,
+                font=prize_font,
+                bd=0,
+                highlightthickness=0,
+            ).pack(fill="x", pady=row_pady)
 
-        horizontal_pad = 110 if compact else 180
         self.prize_scene_frame.pack(before=self.scene_countdown, fill="both", expand=True, padx=horizontal_pad, pady=(0, 8 if compact else 14))
 
     def show_poll_scene_board(self, payload):
@@ -460,7 +488,7 @@ class ViewerGUI(tk.Tk):
             answer = answers.get(str(index))
             was_announced = index in announced
             is_current = index == current_index
-            bg = CURRENT_COLOR if is_current else ("#274f3e" if answer else ("#263a66" if was_announced else "#12346f"))
+            bg = CURRENT_COLOR if is_current else ("#001B0A" if answer else ("#263a66" if was_announced else PANEL_BG))
             fg = "#06122f" if is_current else ("#8ff0c5" if answer else TEXT_MUTED)
             text = f"Câu {index + 1}"
             if answer:
@@ -481,7 +509,7 @@ class ViewerGUI(tk.Tk):
         tk.Label(
             self.poll_scene_frame,
             text=f"Câu {current_index + 1}: {current_question.get('question', '')}",
-            bg="#091b4d",
+            bg=PANEL_BG,
             fg="#ffffff",
             font=question_font,
             wraplength=1120,
@@ -501,9 +529,9 @@ class ViewerGUI(tk.Tk):
             row, column = divmod(position, 2)
             is_selected = selected_answer == key
             is_dimmed = selected_answer and not is_selected
-            bg = CURRENT_COLOR if is_selected else ("#24304c" if is_dimmed else "#102a73")
+            bg = CURRENT_COLOR if is_selected else ("#24304c" if is_dimmed else PANEL_BG)
             fg = "#06122f" if is_selected else ("#93a4cf" if is_dimmed else "#ffffff")
-            border = "#fff3b0" if is_selected else "#d7b75a"
+            border = CURRENT_COLOR if is_selected else PANEL_BORDER
             tk.Label(
                 options_frame,
                 text=f"{key}. {options.get(key, '')}",
@@ -778,12 +806,13 @@ class ViewerGUI(tk.Tk):
             is_milestone = prize_level in [5, 10, 15]
 
             if prize_level < current_level:
-                label.config(bg=WIDGET_BG, fg=PASSED_PRIZE_COLOR)
+                label.config(image=self.prize_row_images["dim"], bg="#050b23", fg=PASSED_PRIZE_COLOR)
             elif prize_level == current_level:
-                label.config(bg=CURRENT_COLOR, fg="black")
+                label.config(image=self.prize_row_images["selected"], bg="#050b23", fg="#050E21")
             else:
                 color = MILESTONE_COLOR if is_milestone else DEFAULT_PRIZE_COLOR
-                label.config(bg=WIDGET_BG, fg=color)
+                image_key = "milestone" if is_milestone else "normal"
+                label.config(image=self.prize_row_images[image_key], bg="#050b23", fg=color)
 
     def handle_lifeline_result(self, data):
         """Xử lý kết quả từ sự trợ giúp (chỉ hiển thị 50:50)."""

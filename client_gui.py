@@ -7,7 +7,7 @@ import random
 import string
 import time
 try:
-    from ui_assets import load_background_source, load_button_images, load_logo_photo, render_background
+    from ui_assets import load_background_source, load_button_images, load_logo_photo, load_lozenge_photo, render_background
 except ImportError:
     messagebox.showerror("Thiếu thư viện", "Vui lòng cài đặt: pip install Pillow")
     exit()
@@ -26,12 +26,12 @@ PRIZE_LEVELS = [
 GRADIENT_START = "#081d4f"
 GRADIENT_END = "#030712"
 WIDGET_BG = "#07143a"
-PANEL_BG = "#091b4d"
-PANEL_BORDER = "#d7b75a"
+PANEL_BG = "#0F254E"
+PANEL_BORDER = "#00D2FF"
 TEXT_MUTED = "#aebbe8"
 MILESTONE_COLOR = "#ffffff"
-CURRENT_COLOR = "#f1c40f"    # Đậm hơn
-DEFAULT_PRIZE_COLOR = "#f39c12"
+CURRENT_COLOR = "#FF9900"
+DEFAULT_PRIZE_COLOR = "#FF9900"
 PASSED_PRIZE_COLOR = "#7f8c8d"
 
 class GameClientGUI(tk.Toplevel):
@@ -64,6 +64,13 @@ class GameClientGUI(tk.Toplevel):
             self.background_source = load_background_source()
             self.btn_images = load_button_images((450, 60))
             self.logo_image = load_logo_photo((72, 72))
+            self.question_panel_image = load_lozenge_photo((880, 135), "normal", radius=18)
+            self.prize_row_images = {
+                "normal": load_lozenge_photo((300, 31), "normal", radius=7),
+                "milestone": load_lozenge_photo((300, 31), "milestone", radius=7),
+                "selected": load_lozenge_photo((300, 31), "selected", radius=7),
+                "dim": load_lozenge_photo((300, 31), "dim", radius=7),
+            }
         except Exception as e:
             messagebox.showerror("Lỗi Tải Ảnh", f"Không thể tải ảnh: {e}")
             self.on_closing()
@@ -100,9 +107,18 @@ class GameClientGUI(tk.Toplevel):
 
         self.prize_labels = []
         for i, prize in enumerate(PRIZE_LEVELS):
-            label = tk.Label(self.prize_frame, text=f"{15 - i:2d} ♦ {prize}",
-                           font=("Segoe UI", 13, "bold"), bg="#050b23", fg="white", anchor='w')
-            label.pack(fill='x', padx=20, pady=2)
+            label = tk.Label(
+                self.prize_frame,
+                text=f"{15 - i:2d}  ♦  {prize}",
+                image=self.prize_row_images["normal"],
+                compound=tk.CENTER,
+                font=("Segoe UI", 12, "bold"),
+                bg="#050b23",
+                fg="white",
+                bd=0,
+                highlightthickness=0,
+            )
+            label.pack(fill='x', padx=14, pady=2)
             self.prize_labels.append(label)
 
         self.main_frame = tk.Frame(self.canvas, bg=WIDGET_BG)
@@ -136,9 +152,10 @@ class GameClientGUI(tk.Toplevel):
         self.game_area = tk.Frame(self.main_frame, bg=WIDGET_BG)
         self.game_area.place(relx=0.5, rely=0.58, anchor=tk.CENTER, relwidth=1, relheight=0.74)
 
-        self.lbl_question = tk.Label(self.game_area, text="...", font=("Arial", 20, "bold"),
-                                   fg="white", bg=PANEL_BG, wraplength=820, justify=tk.CENTER,
-                                   highlightthickness=2, highlightbackground=PANEL_BORDER, padx=24, pady=18)
+        self.lbl_question = tk.Label(self.game_area, text="...", image=self.question_panel_image,
+                                   compound=tk.CENTER, font=("Arial", 20, "bold"),
+                                   fg="white", bg=WIDGET_BG, wraplength=820, justify=tk.CENTER,
+                                   highlightthickness=0, padx=24, pady=18)
         self.lbl_question.place(relx=0.5, rely=0.2, anchor=tk.CENTER, width=880, height=135)
 
         self.lifeline_frame = tk.Frame(self.main_frame, bg=WIDGET_BG)
@@ -306,12 +323,13 @@ class GameClientGUI(tk.Toplevel):
             is_milestone = prize_level in [5, 10, 15]
 
             if prize_level < self.current_level:
-                label.config(bg=WIDGET_BG, fg=PASSED_PRIZE_COLOR)
+                label.config(image=self.prize_row_images["dim"], bg="#050b23", fg=PASSED_PRIZE_COLOR)
             elif prize_level == self.current_level:
-                label.config(bg=CURRENT_COLOR, fg="black")
+                label.config(image=self.prize_row_images["selected"], bg="#050b23", fg="#050E21")
             else:
                 color = MILESTONE_COLOR if is_milestone else DEFAULT_PRIZE_COLOR
-                label.config(bg=WIDGET_BG, fg=color)
+                image_key = "milestone" if is_milestone else "normal"
+                label.config(image=self.prize_row_images[image_key], bg="#050b23", fg=color)
 
     def play_music_by_level(self):
         if 1 <= self.current_level <= 5:
