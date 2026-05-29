@@ -34,6 +34,7 @@ class HostGUI(tk.Tk):
         self.current_level = 0
         self.is_client_muted = False
         self.logo_image = self.load_logo_image()
+        self.poll_window = None
 
         self.create_widgets()
         self.bind_hotkeys()
@@ -418,15 +419,17 @@ class HostGUI(tk.Tk):
         self.log("Viewer: hiện mini quiz.")
 
     def show_poll_scene(self):
-        questions = server_logic.get_interactive_poll_questions(3)
-        server_logic.set_viewer_scene(
-            'poll',
-            'FASTEST FINGER FIRST',
-            'Câu hỏi tương tác dành cho khán giả',
-            payload={'questions': questions},
-            sound='viewer_poll',
-        )
-        self.log(f"Viewer: hiện poll tương tác FFF ({len(questions)} câu).")
+        payload = server_logic.start_interactive_poll_from_host(3)
+        question_count = len(payload.get('questions', []))
+        self.open_poll_control()
+        self.log(f"Viewer: hiện poll tương tác FFF ({question_count} câu).")
+
+    def open_poll_control(self):
+        if self.poll_window and self.poll_window.winfo_exists():
+            self.poll_window.lift()
+            self.poll_window.refresh()
+            return
+        self.poll_window = PollControlWindow(self)
 
     def play_tension_music(self):
         server_logic.play_client_music_from_host('wait_11_15')
@@ -584,6 +587,143 @@ class HostGUI(tk.Tk):
         if messagebox.askokcancel("Thoát", "Bạn có chắc muốn đóng Bảng Điều Khiển không?"):
             self.destroy()
             os._exit(0)
+
+class PollControlWindow(tk.Toplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+        self.title("Điều Khiển Poll Khán Giả")
+        self.geometry("560x460")
+        self.configure(bg=HOST_BG)
+        self.protocol("WM_DELETE_WINDOW", self.close)
+        self.normal_font = font.Font(family="Segoe UI", size=10, weight="bold")
+        self.done_font = font.Font(family="Segoe UI", size=10, weight="bold", overstrike=1)
+        self.question_buttons = []
+        self.option_buttons = []
+        self.build_widgets()
+        self.refresh()
+
+    def build_widgets(self):
+        container = tk.Frame(self, bg=HOST_BG, padx=16, pady=14)
+        container.pack(fill="both", expand=True)
+        tk.Label(
+            container,
+            text="POLL KHÁN GIẢ - FASTEST FINGER FIRST",
+            bg=HOST_BG,
+            fg=HOST_ACCENT,
+            font=("Segoe UI", 13, "bold"),
+            anchor="w",
+        ).pack(fill="x", pady=(0, 10))
+
+        self.current_label = tk.Label(
+            container,
+            text="",
+            bg=HOST_PANEL,
+            fg=HOST_TEXT,
+            font=("Segoe UI", 11, "bold"),
+            wraplength=500,
+            justify=tk.LEFT,
+            padx=12,
+            pady=10,
+            anchor="w",
+        )
+        self.current_label.pack(fill="x", pady=(0, 10))
+
+        self.question_frame = tk.Frame(container, bg=HOST_BG)
+        self.question_frame.pack(fill="both", expand=True)
+
+        option_frame = tk.Frame(container, bg=HOST_BG)
+        option_frame.pack(fill="x", pady=(12, 0))
+        for answer in ["A", "B", "C", "D"]:
+            button = tk.Button(
+                option_frame,
+                text=f"Khán giả chọn {answer}",
+                command=lambda value=answer: self.choose_answer(value),
+                bg=HOST_PANEL_ALT,
+                fg=HOST_TEXT,
+                activebackground="#1b315d",
+                activeforeground=HOST_TEXT,
+                relief=tk.FLAT,
+                font=("Segoe UI", 10, "bold"),
+                padx=10,
+                pady=9,
+            )
+            button.pack(side=tk.LEFT, fill="x", expand=True, padx=4)
+            self.option_buttons.append(button)
+
+    def refresh(self):
+        state = server_logic.get_interactive_poll_state()
+        questions = state.get('questions', [])
+        current_index = state.get('current_index', 0)
+        announced = set(state.get('announced', []))
+        answers = state.get('answers', {})
+
+        for child in self.question_frame.winfo_children():
+            child.destroy()
+        self.question_buttons.clear()
+
+        if not questions:
+            self.current_label.config(text="Chưa có câu hỏi poll nào.")
+            for button in self.option_buttons:
+                button.config(state=tk.DISABLED)
+            return
+
+        current_question = questions[current_index].get('question', '')
+        current_answer = answers.get(str(current_index))
+        status = f" | Khán giả chọn {current_answer}" if current_answer else ""
+        self.current_label.config(text=f"Đang lên sóng câu {current_index + 1}: {current_question}{status}")
+
+        for index, question in enumerate(questions):
+            answer = answers.get(str(index))
+            was_announced = index in announced
+            prefix = "✓" if answer else ("↗" if index == current_index else ("•" if was_announced else "○"))
+            text = f"{prefix} Câu {index + 1}: {question.get('question', '')}"
+            if answer:
+                text += f"  [{answer}]"
+            button = tk.Button(
+                self.question_frame,
+                text=text,
+                command=lambda value=index: self.select_question(value),
+                bg=self.question_bg(index, current_index, was_announced, answer),
+                fg="#09111f" if index == current_index and not answer else HOST_TEXT,
+                activebackground="#1b315d",
+                activeforeground=HOST_TEXT,
+                relief=tk.FLAT,
+                font=self.done_font if was_announced else self.normal_font,
+                anchor="w",
+                justify=tk.LEFT,
+                wraplength=500,
+                padx=12,
+                pady=9,
+            )
+            button.pack(fill="x", pady=4)
+            self.question_buttons.append(button)
+
+        for button in self.option_buttons:
+            button.config(state=tk.NORMAL)
+
+    def question_bg(self, index, current_index, was_announced, answer):
+        if answer:
+            return "#274f3e"
+        if index == current_index:
+            return HOST_ACCENT
+        if was_announced:
+            return "#263a66"
+        return HOST_PANEL_ALT
+
+    def select_question(self, index):
+        if server_logic.select_interactive_poll_question_from_host(index):
+            self.parent.log(f"Poll: công bố câu {index + 1}.")
+        self.refresh()
+
+    def choose_answer(self, answer):
+        if server_logic.answer_interactive_poll_from_host(answer):
+            self.parent.log(f"Poll: khán giả chọn đáp án {answer}.")
+        self.refresh()
+
+    def close(self):
+        self.parent.poll_window = None
+        self.destroy()
 
 class AudienceDialog(simpledialog.Dialog):
     def body(self, master):

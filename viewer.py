@@ -214,6 +214,7 @@ class ViewerGUI(tk.Tk):
         )
         self.scene_message.pack(fill="x", padx=80)
         self.prize_scene_frame = tk.Frame(self.scene_frame, bg="#020817")
+        self.poll_scene_frame = tk.Frame(self.scene_frame, bg="#020817")
         self.scene_countdown = tk.Label(
             self.scene_frame,
             text="",
@@ -277,6 +278,7 @@ class ViewerGUI(tk.Tk):
             self.scene_countdown_job = None
         self.stop_credit_animation()
         self.hide_prize_scene_board()
+        self.hide_poll_scene_board()
         self.scene_frame.place_forget()
 
     def stop_credit_animation(self):
@@ -369,14 +371,30 @@ class ViewerGUI(tk.Tk):
         if not self.scene_message.winfo_manager():
             self.scene_message.pack(before=self.scene_countdown, fill="x", padx=80)
 
+    def hide_poll_scene_board(self):
+        for child in self.poll_scene_frame.winfo_children():
+            child.destroy()
+        self.poll_scene_frame.pack_forget()
+        if not self.scene_message.winfo_manager():
+            self.scene_message.pack(before=self.scene_countdown, fill="x", padx=80)
+
     def show_prize_scene_board(self):
         if self.scene_message.winfo_manager():
             self.scene_message.pack_forget()
         for child in self.prize_scene_frame.winfo_children():
             child.destroy()
 
+        window_height = max(self.winfo_height(), 720)
+        compact = window_height < 860
+        lifeline_font = ("Segoe UI", 10 if compact else 12, "bold")
+        level_font = ("Consolas", 13 if compact else 16, "bold")
+        prize_font = ("Consolas", 14 if compact else 17, "bold")
+        marker_font = ("Segoe UI", 11 if compact else 13, "bold")
+        row_pady = 0 if compact else 1
+        label_pady = 1 if compact else 3
+
         lifeline_row = tk.Frame(self.prize_scene_frame, bg="#020817")
-        lifeline_row.pack(fill="x", pady=(0, 12))
+        lifeline_row.pack(fill="x", pady=(0, 7 if compact else 12))
         for key, label in [
             ("5050", "50:50"),
             ("audience", "KHÁN GIẢ"),
@@ -393,9 +411,9 @@ class ViewerGUI(tk.Tk):
                 text=f"{label}  {status}",
                 bg=bg,
                 fg=fg,
-                font=("Segoe UI", 12, "bold"),
-                padx=14,
-                pady=7,
+                font=lifeline_font,
+                padx=10 if compact else 14,
+                pady=5 if compact else 7,
             ).pack(side=tk.LEFT, padx=5)
 
         board = tk.Frame(self.prize_scene_frame, bg="#020817")
@@ -409,13 +427,108 @@ class ViewerGUI(tk.Tk):
             fg = "#06122f" if is_current else (PASSED_PRIZE_COLOR if is_passed else (MILESTONE_COLOR if is_milestone else DEFAULT_PRIZE_COLOR))
             mark_fg = "#06122f" if is_current else (PANEL_BORDER if is_milestone else "#8bb4ff")
             row = tk.Frame(board, bg=bg, highlightthickness=1, highlightbackground=PANEL_BORDER if is_current else "#1a2c61")
-            row.pack(fill="x", pady=1)
-            tk.Label(row, text="▶" if is_current else " ", bg=bg, fg=fg, width=2, font=("Segoe UI", 13, "bold")).pack(side=tk.LEFT)
-            tk.Label(row, text=f"{level:02d}", bg=bg, fg=fg, width=4, font=("Consolas", 16, "bold")).pack(side=tk.LEFT)
-            tk.Label(row, text="◆", bg=bg, fg=mark_fg, width=2, font=("Segoe UI", 13, "bold")).pack(side=tk.LEFT)
-            tk.Label(row, text=f"{prize} VNĐ", bg=bg, fg=fg, font=("Consolas", 17, "bold"), anchor="w").pack(side=tk.LEFT, fill="x", expand=True, padx=(8, 14), pady=3)
+            row.pack(fill="x", pady=row_pady)
+            tk.Label(row, text="▶" if is_current else " ", bg=bg, fg=fg, width=2, font=marker_font).pack(side=tk.LEFT)
+            tk.Label(row, text=f"{level:02d}", bg=bg, fg=fg, width=4, font=level_font).pack(side=tk.LEFT)
+            tk.Label(row, text="◆", bg=bg, fg=mark_fg, width=2, font=marker_font).pack(side=tk.LEFT)
+            tk.Label(row, text=f"{prize} VNĐ", bg=bg, fg=fg, font=prize_font, anchor="w").pack(side=tk.LEFT, fill="x", expand=True, padx=(8, 14), pady=label_pady)
 
-        self.prize_scene_frame.pack(before=self.scene_countdown, fill="both", expand=True, padx=180, pady=(0, 14))
+        horizontal_pad = 110 if compact else 180
+        self.prize_scene_frame.pack(before=self.scene_countdown, fill="both", expand=True, padx=horizontal_pad, pady=(0, 8 if compact else 14))
+
+    def show_poll_scene_board(self, payload):
+        if self.scene_message.winfo_manager():
+            self.scene_message.pack_forget()
+        for child in self.poll_scene_frame.winfo_children():
+            child.destroy()
+
+        questions = payload.get('questions', [])
+        current_index = int(payload.get('current_index', 0) or 0)
+        announced = set(payload.get('announced', []))
+        answers = payload.get('answers', {})
+        if not questions:
+            self.scene_message.config(text="Chưa tìm thấy câu hỏi tương tác trong pack dự phòng.")
+            self.scene_message.pack(before=self.scene_countdown, fill="x", padx=80)
+            return
+
+        current_index = min(max(current_index, 0), len(questions) - 1)
+        progress = tk.Frame(self.poll_scene_frame, bg="#020817")
+        progress.pack(fill="x", pady=(0, 18))
+        done_font = ("Segoe UI", 13, "bold overstrike")
+        active_font = ("Segoe UI", 13, "bold")
+        for index, question in enumerate(questions):
+            answer = answers.get(str(index))
+            was_announced = index in announced
+            is_current = index == current_index
+            bg = CURRENT_COLOR if is_current else ("#274f3e" if answer else ("#263a66" if was_announced else "#12346f"))
+            fg = "#06122f" if is_current else ("#8ff0c5" if answer else TEXT_MUTED)
+            text = f"Câu {index + 1}"
+            if answer:
+                text += f"  {answer}"
+            tk.Label(
+                progress,
+                text=text,
+                bg=bg,
+                fg=fg,
+                font=done_font if was_announced else active_font,
+                padx=18,
+                pady=8,
+            ).pack(side=tk.LEFT, padx=6)
+
+        current_question = questions[current_index]
+        selected_answer = answers.get(str(current_index))
+        question_font = ("Segoe UI", 24, "bold overstrike") if selected_answer else ("Segoe UI", 24, "bold")
+        tk.Label(
+            self.poll_scene_frame,
+            text=f"Câu {current_index + 1}: {current_question.get('question', '')}",
+            bg="#091b4d",
+            fg="#ffffff",
+            font=question_font,
+            wraplength=1120,
+            justify=tk.CENTER,
+            highlightthickness=2,
+            highlightbackground=PANEL_BORDER,
+            padx=28,
+            pady=20,
+        ).pack(fill="x", pady=(0, 22))
+
+        options_frame = tk.Frame(self.poll_scene_frame, bg="#020817")
+        options_frame.pack(fill="x")
+        options_frame.grid_columnconfigure(0, weight=1)
+        options_frame.grid_columnconfigure(1, weight=1)
+        options = current_question.get('options', {})
+        for position, key in enumerate(["A", "B", "C", "D"]):
+            row, column = divmod(position, 2)
+            is_selected = selected_answer == key
+            is_dimmed = selected_answer and not is_selected
+            bg = CURRENT_COLOR if is_selected else ("#24304c" if is_dimmed else "#102a73")
+            fg = "#06122f" if is_selected else ("#93a4cf" if is_dimmed else "#ffffff")
+            border = "#fff3b0" if is_selected else "#d7b75a"
+            tk.Label(
+                options_frame,
+                text=f"{key}. {options.get(key, '')}",
+                bg=bg,
+                fg=fg,
+                font=("Segoe UI", 18, "bold"),
+                wraplength=520,
+                justify=tk.LEFT,
+                anchor="w",
+                highlightthickness=2,
+                highlightbackground=border,
+                padx=20,
+                pady=14,
+            ).grid(row=row, column=column, sticky="ew", padx=8, pady=8)
+
+        if selected_answer:
+            tk.Label(
+                self.poll_scene_frame,
+                text=f"Khán giả chọn đáp án {selected_answer}",
+                bg="#020817",
+                fg=CURRENT_COLOR,
+                font=("Segoe UI", 24, "bold"),
+            ).pack(fill="x", pady=(20, 0))
+
+        self.poll_scene_frame.pack(before=self.scene_countdown, fill="both", expand=True, padx=130, pady=(0, 24))
 
     def poll_scene_text(self, intro, questions):
         lines = [intro] if intro else []
@@ -438,9 +551,15 @@ class ViewerGUI(tk.Tk):
         stats = data.get('stats', {})
         self.stop_credit_animation()
         self.hide_prize_scene_board()
+        self.hide_poll_scene_board()
         self.scene_title.config(font=("Segoe UI", 34, "bold"))
         self.scene_message.config(font=("Segoe UI", 22), justify=tk.CENTER)
-        if scene in ['prize', 'credits']:
+        if scene == 'prize':
+            self.scene_title.config(font=("Segoe UI", 30, "bold"))
+            self.scene_title.pack_configure(expand=False, fill="x", pady=(24, 8))
+            self.scene_message.pack_configure(fill="both", expand=True, padx=100)
+            self.scene_countdown.pack_configure(pady=(4, 18))
+        elif scene in ['credits', 'poll']:
             self.scene_title.pack_configure(expand=False, fill="x", pady=(42, 12))
             self.scene_message.pack_configure(fill="both", expand=True, padx=130)
             self.scene_countdown.pack_configure(pady=(8, 30))
@@ -481,8 +600,7 @@ class ViewerGUI(tk.Tk):
             self.scene_title.config(font=("Segoe UI", 42, "bold"))
             self.scene_message.config(font=("Segoe UI", 24, "bold"), justify=tk.CENTER)
         elif scene == 'poll':
-            message = self.poll_scene_text(message, payload.get('questions', []))
-            self.scene_message.config(font=("Segoe UI", 17, "bold"), justify=tk.LEFT)
+            message = ""
         elif scene == 'mini_quiz':
             message = message + "\n\nHãy giữ câu trả lời của bạn cho phần quay lại."
 
@@ -492,10 +610,13 @@ class ViewerGUI(tk.Tk):
         self.scene_message.config(text=message)
         if scene == 'prize':
             self.show_prize_scene_board()
+        elif scene == 'poll':
+            self.show_poll_scene_board(payload)
         self.scene_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
         self.scene_frame.tkraise()
         self.start_scene_countdown(data.get('countdown_seconds', 0))
-        self.play_scene_audio(data.get('sound'), data.get('sound_loop', False))
+        if not (scene == 'poll' and not data.get('sound')):
+            self.play_scene_audio(data.get('sound'), data.get('sound_loop', False))
         if scene == 'credits':
             self.start_credit_animation(self.credit_lines_from_payload(payload))
 

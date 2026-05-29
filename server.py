@@ -21,6 +21,7 @@ PRIZE_LEVELS = [
 READY_REQUIRED_FROM_LEVEL = 6
 LOSS_GUARANTEE_FROM_LEVEL_6 = "5.000.000"
 LOSS_GUARANTEE_FROM_LEVEL_11 = "22.000.000"
+LOSS_PRIZE_FROM_LEVEL_10 = "5.000.000"
 
 # --- BIẾN TOÀN CỤC ---
 player_conn = None
@@ -32,6 +33,7 @@ current_game_state_packet = None
 current_viewer_scene_packet = None
 current_question_index = None
 active_question_pack_path = None
+current_poll_session = None
 current_stats = {
     'questions_seen': 0,
     'correct_answers': 0,
@@ -214,6 +216,64 @@ def play_effect_from_host(name):
     broadcast({'type': 'play_effect', 'name': name})
     return True
 
+def poll_payload_from_session():
+    if not current_poll_session:
+        return {'questions': [], 'current_index': 0, 'announced': [], 'answers': {}}
+    return {
+        'questions': current_poll_session.get('questions', []),
+        'current_index': current_poll_session.get('current_index', 0),
+        'announced': sorted(current_poll_session.get('announced', set())),
+        'answers': {str(index): answer for index, answer in current_poll_session.get('answers', {}).items()},
+    }
+
+def broadcast_interactive_poll(sound=None):
+    payload = poll_payload_from_session()
+    set_viewer_scene(
+        'poll',
+        'FASTEST FINGER FIRST',
+        'Host đang lấy ý kiến khán giả',
+        payload=payload,
+        sound=sound,
+    )
+    return payload
+
+def start_interactive_poll_from_host(count=3):
+    global current_poll_session
+    questions = get_interactive_poll_questions(count)
+    current_poll_session = {
+        'questions': questions,
+        'current_index': 0,
+        'announced': {0} if questions else set(),
+        'answers': {},
+    }
+    return broadcast_interactive_poll(sound='viewer_poll')
+
+def select_interactive_poll_question_from_host(index):
+    if not current_poll_session:
+        return False
+    questions = current_poll_session.get('questions', [])
+    if index < 0 or index >= len(questions):
+        return False
+    current_poll_session['current_index'] = index
+    current_poll_session.setdefault('announced', set()).add(index)
+    broadcast_interactive_poll()
+    return True
+
+def answer_interactive_poll_from_host(answer):
+    if not current_poll_session:
+        return False
+    normalized_answer = str(answer).strip().upper()
+    if normalized_answer not in ['A', 'B', 'C', 'D']:
+        return False
+    index = current_poll_session.get('current_index', 0)
+    current_poll_session.setdefault('answers', {})[index] = normalized_answer
+    current_poll_session.setdefault('announced', set()).add(index)
+    broadcast_interactive_poll()
+    return True
+
+def get_interactive_poll_state():
+    return poll_payload_from_session()
+
 def end_program_from_host():
     global is_game_paused
     is_game_paused = True
@@ -361,11 +421,9 @@ def needs_ready_confirmation(level):
     return level >= READY_REQUIRED_FROM_LEVEL
 
 def final_prize_on_wrong(level, current_prize):
-    if level >= 11:
-        return LOSS_GUARANTEE_FROM_LEVEL_11
-    if level >= 6:
-        return LOSS_GUARANTEE_FROM_LEVEL_6
-    return "0"
+    if level >= 10:
+        return LOSS_PRIZE_FROM_LEVEL_10
+    return current_prize or "0"
 
 def load_random_question_pack():
     global QUESTIONS, active_question_pack_path
