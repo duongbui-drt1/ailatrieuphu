@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import scrolledtext, font, simpledialog, messagebox
+from tkinter import scrolledtext, font, simpledialog, messagebox, ttk
 import threading
 import time
 import os
@@ -35,6 +35,7 @@ class HostGUI(tk.Tk):
         self.is_client_muted = False
         self.logo_image = self.load_logo_image()
         self.poll_window = None
+        self.configure_host_style()
 
         self.create_widgets()
         self.bind_hotkeys()
@@ -50,6 +51,26 @@ class HostGUI(tk.Tk):
             return load_logo_photo((58, 58))
         except Exception:
             return None
+
+    def configure_host_style(self):
+        self.host_style = ttk.Style(self)
+        try:
+            self.host_style.theme_use("clam")
+        except tk.TclError:
+            pass
+        self.host_style.configure("Host.TNotebook", background=HOST_PANEL, borderwidth=0)
+        self.host_style.configure(
+            "Host.TNotebook.Tab",
+            background=HOST_PANEL_ALT,
+            foreground=HOST_MUTED,
+            padding=(16, 8),
+            font=("Segoe UI", 10, "bold"),
+        )
+        self.host_style.map(
+            "Host.TNotebook.Tab",
+            background=[("selected", "#16326b"), ("active", "#1a315a")],
+            foreground=[("selected", HOST_TEXT), ("active", HOST_TEXT)],
+        )
 
     def create_widgets(self):
         main_frame = tk.Frame(self, bg=HOST_BG, padx=18, pady=16)
@@ -218,14 +239,27 @@ class HostGUI(tk.Tk):
         )
         self.mc_notes.pack(fill="x", pady=(4, 0))
 
-        log_frame = tk.Frame(work_area, bg=HOST_PANEL, highlightthickness=1, highlightbackground=HOST_BORDER, padx=12, pady=12)
-        log_frame.grid(row=0, column=1, sticky="nsew")
-        log_frame.grid_rowconfigure(1, weight=1)
-        log_frame.grid_columnconfigure(0, weight=1)
-        tk.Label(log_frame, text="NHẬT KÝ SERVER", bg=HOST_PANEL, fg=HOST_ACCENT, font=("Segoe UI", 12, "bold"), anchor="w").grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        host_panel = tk.Frame(work_area, bg=HOST_PANEL, highlightthickness=1, highlightbackground=HOST_BORDER, padx=10, pady=10)
+        host_panel.grid(row=0, column=1, sticky="nsew")
+        host_panel.grid_rowconfigure(0, weight=1)
+        host_panel.grid_columnconfigure(0, weight=1)
+
+        host_tabs = ttk.Notebook(host_panel, style="Host.TNotebook")
+        host_tabs.grid(row=0, column=0, sticky="nsew")
+
+        question_tab = tk.Frame(host_tabs, bg=HOST_PANEL, padx=14, pady=14)
+        log_tab = tk.Frame(host_tabs, bg=HOST_PANEL, padx=12, pady=12)
+        host_tabs.add(question_tab, text="Câu hỏi")
+        host_tabs.add(log_tab, text="Nhật ký")
+
+        self.build_question_tab(question_tab)
+
+        log_tab.grid_rowconfigure(1, weight=1)
+        log_tab.grid_columnconfigure(0, weight=1)
+        tk.Label(log_tab, text="NHẬT KÝ SERVER", bg=HOST_PANEL, fg=HOST_ACCENT, font=("Segoe UI", 12, "bold"), anchor="w").grid(row=0, column=0, sticky="ew", pady=(0, 8))
 
         self.log_text = scrolledtext.ScrolledText(
-            log_frame,
+            log_tab,
             wrap=tk.WORD,
             state='disabled',
             font=self.log_font,
@@ -236,6 +270,117 @@ class HostGUI(tk.Tk):
             bd=0,
         )
         self.log_text.grid(row=1, column=0, sticky="nsew")
+        self.update_question_tab(clear=True)
+
+    def build_question_tab(self, parent):
+        parent.grid_columnconfigure(0, weight=1)
+        parent.grid_rowconfigure(2, weight=1)
+        tk.Label(
+            parent,
+            text="CÂU HỎI ĐANG LÊN SÓNG",
+            bg=HOST_PANEL,
+            fg=HOST_ACCENT,
+            font=("Segoe UI", 12, "bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew")
+        self.host_question_status = tk.Label(
+            parent,
+            text="Chưa có câu hỏi đang lên sóng.",
+            bg=HOST_PANEL,
+            fg=HOST_MUTED,
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        )
+        self.host_question_status.grid(row=1, column=0, sticky="ew", pady=(4, 12))
+
+        question_card = tk.Frame(parent, bg="#061120", highlightthickness=1, highlightbackground=HOST_BORDER, padx=14, pady=14)
+        question_card.grid(row=2, column=0, sticky="nsew")
+        question_card.grid_columnconfigure(0, weight=1)
+        question_card.grid_rowconfigure(1, weight=1)
+
+        self.host_question_text = tk.Label(
+            question_card,
+            text="...",
+            bg="#061120",
+            fg=HOST_TEXT,
+            font=("Segoe UI", 17, "bold"),
+            anchor="nw",
+            justify=tk.LEFT,
+            wraplength=560,
+        )
+        self.host_question_text.grid(row=0, column=0, sticky="ew", pady=(0, 14))
+
+        options_frame = tk.Frame(question_card, bg="#061120")
+        options_frame.grid(row=1, column=0, sticky="nsew")
+        options_frame.grid_columnconfigure(0, weight=1)
+        self.host_option_labels = {}
+        for index, key in enumerate(["A", "B", "C", "D"]):
+            option_label = tk.Label(
+                options_frame,
+                text=f"{key}. ...",
+                bg=HOST_PANEL_ALT,
+                fg=HOST_TEXT,
+                font=("Segoe UI", 12, "bold"),
+                anchor="w",
+                justify=tk.LEFT,
+                wraplength=520,
+                padx=12,
+                pady=9,
+            )
+            option_label.grid(row=index, column=0, sticky="ew", pady=(0, 8))
+            self.host_option_labels[key] = option_label
+
+        self.host_answer_label = tk.Label(
+            question_card,
+            text="Đáp án đúng: ...",
+            bg="#061120",
+            fg=HOST_GREEN,
+            font=("Segoe UI", 12, "bold"),
+            anchor="w",
+        )
+        self.host_answer_label.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+
+        question_card.bind(
+            "<Configure>",
+            lambda event: self.adjust_question_wrap(event.width),
+        )
+
+    def adjust_question_wrap(self, width):
+        wrap = max(320, width - 36)
+        if hasattr(self, "host_question_text"):
+            self.host_question_text.config(wraplength=wrap)
+        if hasattr(self, "host_option_labels"):
+            for label in self.host_option_labels.values():
+                label.config(wraplength=max(280, wrap - 40))
+
+    def update_question_tab(self, data=None, clear=False, status=None):
+        if not hasattr(self, "host_question_status"):
+            return
+        if clear or not data:
+            self.host_question_status.config(text=status or "Chưa có câu hỏi đang lên sóng.", fg=HOST_MUTED)
+            self.host_question_text.config(text="...")
+            for key, label in self.host_option_labels.items():
+                label.config(text=f"{key}. ...", fg=HOST_MUTED, bg=HOST_PANEL_ALT)
+            self.host_answer_label.config(text="Đáp án đúng: ...")
+            return
+
+        level = data.get("level", "?")
+        prize = data.get("prize", "")
+        prize_text = f" - {prize} VNĐ" if prize else ""
+        self.host_question_status.config(text=status or f"Đang hỏi câu {level}{prize_text}", fg=HOST_ACCENT)
+        self.host_question_text.config(text=data.get("question") or "...")
+
+        options = data.get("options") or {}
+        answer = (data.get("answer") or "").strip().upper()
+        for key, label in self.host_option_labels.items():
+            option_text = options.get(key) or "..."
+            is_answer = key == answer
+            label.config(
+                text=f"{key}. {option_text}",
+                fg=HOST_GREEN if is_answer else HOST_TEXT,
+                bg="#102647" if is_answer else HOST_PANEL_ALT,
+            )
+        self.host_answer_label.config(text=f"Đáp án đúng: {answer or '...'}")
 
     def create_metric_card(self, parent, title, value, column, accent=HOST_TEXT):
         card = tk.Frame(parent, bg=HOST_PANEL, highlightthickness=1, highlightbackground=HOST_BORDER, padx=14, pady=12)
@@ -510,6 +655,7 @@ class HostGUI(tk.Tk):
             self.lbl_name.config(text=data['name'])
             self.lbl_id.config(text=data['id'])
             self.lbl_last_answer.config(text="Thí sinh đã kết nối, chờ câu hỏi", fg=HOST_ACCENT)
+            self.update_question_tab(clear=True, status="Thí sinh đã kết nối. Chờ câu hỏi lên sóng.")
             self.log(f"Người chơi '{data['name']}' đã kết nối từ {data['addr']}")
         elif msg_type == 'disconnect':
             self.lbl_name.config(text="Chờ kết nối...")
@@ -517,6 +663,7 @@ class HostGUI(tk.Tk):
             self.lbl_level.config(text="0")
             self.lbl_prize.config(text="0 VNĐ")
             self.lbl_last_answer.config(text="Chưa có đáp án được chốt", fg=HOST_TEXT)
+            self.update_question_tab(clear=True)
             self.current_level = 0
             self.force_ready_button.config(state=tk.DISABLED)
             self.confirm_answer_button.config(state=tk.DISABLED)
@@ -525,9 +672,15 @@ class HostGUI(tk.Tk):
             self.lbl_level.config(text=str(data['level']))
             self.lbl_prize.config(text=f"{data['prize']} VNĐ")
             self.lbl_last_answer.config(text=f"Đang ở câu {data['level']}, chờ thí sinh chốt đáp án", fg=HOST_TEXT)
+            self.update_question_tab(clear=True, status=f"Chuẩn bị câu {data['level']} - {data['prize']} VNĐ")
             self.confirm_answer_button.config(state=tk.DISABLED)
         elif msg_type == 'question_live':
             self.lbl_last_answer.config(text=f"Đang chờ thí sinh trả lời câu {data['level']}", fg=HOST_TEXT)
+            status = data.get('status') or f"Đang hỏi câu {data['level']} - {data.get('prize', '')} VNĐ"
+            self.update_question_tab(data, status=status)
+        elif msg_type == 'question_preview':
+            status = data.get('status') or f"Chuẩn bị hỏi câu {data['level']} - {data.get('prize', '')} VNĐ"
+            self.update_question_tab(data, status=status)
         elif msg_type == 'ready_waiting':
             self.force_ready_button.config(text=f"Bắt đầu câu {data['level']}", state=tk.NORMAL)
             self.lbl_last_answer.config(text=f"Đang chờ thí sinh sẵn sàng cho câu {data['level']}", fg=HOST_ACCENT)
@@ -541,12 +694,14 @@ class HostGUI(tk.Tk):
                 self.confirm_answer_button.config(state=tk.DISABLED)
                 text = f"Đã chốt đáp án {data['player_answer']} - tự động công bố"
             self.lbl_last_answer.config(text=text, fg=HOST_ACCENT)
+            self.host_question_status.config(text=text, fg=HOST_ACCENT)
             self.log(text)
         elif msg_type == 'answer':
             self.confirm_answer_button.config(text="Công bố đáp án", state=tk.DISABLED)
             status, color = ("ĐÚNG", HOST_GREEN) if data['is_correct'] else ("SAI", HOST_RED)
             text = f"'{data['player_answer']}' -> Đáp án đúng: '{data['correct_answer']}' ({status})"
             self.lbl_last_answer.config(text=text, fg=color)
+            self.host_question_status.config(text=f"Kết quả câu {self.lbl_level.cget('text')}: {status}", fg=color)
             self.log(f"Người chơi trả lời câu {self.lbl_level.cget('text')}: {text}")
         elif msg_type == 'wise_man_request':
             self.handle_wise_man_request(data['question'], data['answer'])

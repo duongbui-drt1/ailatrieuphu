@@ -695,7 +695,7 @@ class GameClientGUI(tk.Toplevel):
         data = data or {}
         self.play_final_audio(True)
         self.show_final_overlay(
-            "CHÚC MỪNG ĐÃ HOÀN THÀNH PHẦN THI",
+            "CHÚC MỪNG TRIỆU PHÚ",
             data.get('player_name', self.player_name),
             data.get('prize', '500.000.000'),
             True,

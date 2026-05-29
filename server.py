@@ -319,6 +319,25 @@ def get_current_question_snapshot():
         'prize': current_game_state_packet.get('prize', ''),
     }
 
+def notify_host_question_panel(event_type='question_live', status=None, question_data=None, level=None, prize=None):
+    if question_data:
+        payload = {
+            'type': event_type,
+            'level': level or question_data.get('level', ''),
+            'question': question_data.get('question', ''),
+            'options': question_data.get('options', {}).copy(),
+            'answer': question_data.get('answer', ''),
+            'prize': prize or '',
+        }
+    else:
+        snapshot = get_current_question_snapshot()
+        if not snapshot:
+            return
+        payload = {'type': event_type, **snapshot}
+    if status:
+        payload['status'] = status
+    update_host_gui(payload)
+
 def update_current_question_from_host(question, options, answer):
     global current_game_state_packet
     if current_question_index is None or current_game_state_packet is None:
@@ -341,6 +360,7 @@ def update_current_question_from_host(question, options, answer):
         'options': QUESTIONS[current_question_index]['options'].copy(),
     }
     broadcast(current_game_state_packet)
+    notify_host_question_panel()
     update_host_gui({'type': 'log', 'message': f"Host đã cập nhật câu {current_question_index + 1}."})
     return True
 
@@ -545,6 +565,13 @@ def handle_client(conn, addr, player_info):
             q_data = QUESTIONS[current_level]
             current_q_options = q_data['options'].copy()
             update_host_gui({'type': 'game_state', 'level': current_level + 1, 'prize': game_state['prize']})
+            notify_host_question_panel(
+                event_type='question_preview',
+                question_data={**q_data, 'options': current_q_options},
+                level=current_level + 1,
+                prize=PRIZE_LEVELS[current_level],
+                status=f"Chuẩn bị hỏi câu {current_level + 1} - {PRIZE_LEVELS[current_level]} VNĐ",
+            )
 
             broadcast({'type': 'ask_ready', 'level': current_level + 1})
             set_waiting_for_ready(current_level + 1)
@@ -575,11 +602,15 @@ def handle_client(conn, addr, player_info):
             while True:
                 if needs_question_broadcast:
                     current_game_state_packet = {
-                        'type': 'question', 'question': q_data['question'], 'options': current_q_options,
-                        'level': current_level + 1, 'prize': PRIZE_LEVELS[current_level], 'lifelines': game_state['lifelines']
+                        'type': 'question',
+                        'question': q_data['question'],
+                        'options': current_q_options,
+                        'level': current_level + 1,
+                        'prize': PRIZE_LEVELS[current_level],
+                        'lifelines': game_state['lifelines'],
                     }
                     broadcast(current_game_state_packet)
-                    update_host_gui({'type': 'question_live', 'level': current_level + 1})
+                    notify_host_question_panel()
                     current_stats['questions_seen'] = max(current_stats['questions_seen'], current_level + 1)
                     needs_question_broadcast = False
 

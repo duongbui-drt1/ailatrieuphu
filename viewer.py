@@ -923,7 +923,7 @@ class ViewerGUI(tk.Tk):
         self.play_final_audio(is_win)
         player_name = data.get('player_name', 'Thí sinh')
         prize = data.get('prize', '0')
-        title = "CHÚC MỪNG HOÀN THÀNH PHẦN THI" if is_win else "PHẦN THI KẾT THÚC"
+        title = "CHÚC MỪNG TRIỆU PHÚ" if is_win else "PHẦN THI KẾT THÚC"
         self.show_overlay(f"{title}\n\n{player_name}\nSố tiền nhận được: {prize} VNĐ")
         self.status_bar.config(text=f"Kết thúc lượt chơi. Số tiền nhận được: {prize} VNĐ")
 
