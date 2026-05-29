@@ -198,6 +198,10 @@ class HostGUI(tk.Tk):
             ("Nhạc căng", self.play_tension_music),
             ("Dừng nhạc", self.stop_client_music),
         ])
+        self.create_button_row(control_frame, [
+            ("Nhạc nghỉ", self.play_break_music),
+            ("Dừng nghỉ", self.stop_break_music),
+        ])
         self.create_control_button(control_frame, "Phát còi kết thúc", self.play_end_buzzer, bg="#5f2940").pack(fill="x", pady=5)
 
         self.add_group_label(control_frame, "GHI CHÚ MC")
@@ -438,6 +442,14 @@ class HostGUI(tk.Tk):
     def stop_client_music(self):
         server_logic.stop_client_music_from_host()
         self.log("Đã dừng nhạc client.")
+
+    def play_break_music(self):
+        server_logic.play_client_music_from_host('viewer_break')
+        self.log("Đã phát nhạc hiệu nghỉ/quảng cáo cho client.")
+
+    def stop_break_music(self):
+        server_logic.stop_client_music_from_host()
+        self.log("Đã dừng nhạc hiệu nghỉ/quảng cáo.")
 
     def play_end_buzzer(self):
         server_logic.play_effect_from_host('end_buzzer')

@@ -54,6 +54,7 @@ class GameClientGUI(tk.Toplevel):
         self.pending_lifeline_type = None
         self.pending_lifeline_job = None
         self.lifeline_audio_job = None
+        self.answer_buttons_locked = False
 
         self.load_assets()
         self.create_widgets()
@@ -128,30 +129,30 @@ class GameClientGUI(tk.Toplevel):
         self.main_background_label = tk.Label(self.main_frame, bd=0)
         self.main_background_label.place(x=0, y=0, relwidth=1, relheight=1)
 
-        self.header_frame = tk.Frame(self.main_frame, bg=WIDGET_BG)
-        self.header_frame.place(relx=0.04, rely=0.035, relwidth=0.92, height=88)
+        self.header_frame = tk.Frame(self.main_frame, bg="#061128")
+        self.header_frame.place(relx=0.04, rely=0.035, width=650, height=88)
 
         if self.logo_image:
-            tk.Label(self.header_frame, image=self.logo_image, bg=WIDGET_BG).pack(side=tk.LEFT, padx=(0, 14))
+            tk.Label(self.header_frame, image=self.logo_image, bg="#061128").pack(side=tk.LEFT, padx=(0, 14))
 
-        title_frame = tk.Frame(self.header_frame, bg=WIDGET_BG)
-        title_frame.pack(side=tk.LEFT, fill="both", expand=True)
+        title_frame = tk.Frame(self.header_frame, bg="#061128")
+        title_frame.pack(side=tk.LEFT, fill="y")
         tk.Label(
             title_frame,
             text="AI LÀ TRIỆU PHÚ",
             font=("Segoe UI", 25, "bold"),
             fg="white",
-            bg=WIDGET_BG,
+            bg="#061128",
             anchor="w",
-        ).pack(fill="x")
+        ).pack(anchor="w")
         tk.Label(
             title_frame,
             text=f"Thí sinh: {self.player_name}",
             font=("Segoe UI", 12),
             fg=TEXT_MUTED,
-            bg=WIDGET_BG,
+            bg="#061128",
             anchor="w",
-        ).pack(fill="x", pady=(2, 0))
+        ).pack(anchor="w", pady=(2, 0))
 
         self.game_area = tk.Frame(self.main_frame, bg=WIDGET_BG)
         self.game_area.place(relx=0.5, rely=0.58, anchor=tk.CENTER, relwidth=1, relheight=0.74)
@@ -329,6 +330,7 @@ class GameClientGUI(tk.Toplevel):
 
     def update_question_display(self, data):
         self.game_has_ended = False
+        self.answer_buttons_locked = False
         self.current_level = data['level']
         self.current_lifelines_state = data['lifelines']
         if self.pending_lifeline_type == '5050':
@@ -382,9 +384,10 @@ class GameClientGUI(tk.Toplevel):
             self.audio_manager.play('wait_11_15', loop=True)
 
     def set_visible_answer_buttons_state(self, state):
+        self.answer_buttons_locked = state != "normal"
         for btn in self.option_buttons.values():
             if btn.winfo_ismapped():
-                btn.config(state=state)
+                btn.config(state="normal")
 
     def handle_lifeline_result(self, data):
         lifeline_type = data['lifeline']
@@ -404,12 +407,15 @@ class GameClientGUI(tk.Toplevel):
         self.finish_lifeline(lifeline_type)
 
     def send_answer(self, answer):
+        if self.answer_buttons_locked:
+            self.status_bar.config(text="Đang khóa đáp án trong lúc chạy hiệu ứng, vui lòng chờ...")
+            return
         self.cancel_pending_lifeline(update_buttons=False)
+        self.answer_buttons_locked = True
         self.audio_manager.play('selected')
 
-        # Disable all buttons
         for btn in self.option_buttons.values():
-            btn.config(state="disabled")
+            btn.config(state="normal")
         for btn in self.lifeline_buttons.values():
             btn.config(state="disabled")
 
@@ -480,6 +486,7 @@ class GameClientGUI(tk.Toplevel):
         self.status_bar.config(text=f"Ping: {ping:.0f}ms ({status})")
 
     def unlock_answer_selection(self):
+        self.answer_buttons_locked = False
         for option, btn in self.option_buttons.items():
             if btn.winfo_ismapped():
                 btn.config(state="normal", image=self.btn_images['normal'])

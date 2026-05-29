@@ -131,30 +131,30 @@ class ViewerGUI(tk.Tk):
         self.main_background_label = tk.Label(self.main_frame, bd=0)
         self.main_background_label.place(x=0, y=0, relwidth=1, relheight=1)
 
-        header_frame = tk.Frame(self.main_frame, bg=WIDGET_BG)
-        header_frame.place(relx=0.04, rely=0.035, relwidth=0.92, height=88)
+        header_frame = tk.Frame(self.main_frame, bg="#061128")
+        header_frame.place(relx=0.04, rely=0.035, width=650, height=88)
 
         if self.logo_image:
-            tk.Label(header_frame, image=self.logo_image, bg=WIDGET_BG).pack(side=tk.LEFT, padx=(0, 14))
+            tk.Label(header_frame, image=self.logo_image, bg="#061128").pack(side=tk.LEFT, padx=(0, 14))
 
-        title_frame = tk.Frame(header_frame, bg=WIDGET_BG)
-        title_frame.pack(side=tk.LEFT, fill="both", expand=True)
+        title_frame = tk.Frame(header_frame, bg="#061128")
+        title_frame.pack(side=tk.LEFT, fill="y")
         tk.Label(
             title_frame,
             text="KHÁN GIẢ TRỰC TIẾP",
             font=("Segoe UI", 25, "bold"),
             fg="white",
-            bg=WIDGET_BG,
+            bg="#061128",
             anchor="w",
-        ).pack(fill="x")
+        ).pack(anchor="w")
         tk.Label(
             title_frame,
             text="Sân khấu Ai Là Triệu Phú",
             font=("Segoe UI", 12),
             fg=TEXT_MUTED,
-            bg=WIDGET_BG,
+            bg="#061128",
             anchor="w",
-        ).pack(fill="x", pady=(2, 0))
+        ).pack(anchor="w", pady=(2, 0))
 
         self.game_area = tk.Frame(self.main_frame, bg=WIDGET_BG)
         self.game_background_label = tk.Label(self.game_area, bd=0)
