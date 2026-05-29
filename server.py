@@ -224,6 +224,7 @@ def poll_payload_from_session():
         'current_index': current_poll_session.get('current_index', 0),
         'announced': sorted(current_poll_session.get('announced', set())),
         'answers': {str(index): answer for index, answer in current_poll_session.get('answers', {}).items()},
+        'locked': sorted(current_poll_session.get('locked', set())),
     }
 
 def broadcast_interactive_poll(sound=None):
@@ -245,6 +246,7 @@ def start_interactive_poll_from_host(count=3):
         'current_index': 0,
         'announced': {0} if questions else set(),
         'answers': {},
+        'locked': set(),
     }
     return broadcast_interactive_poll(sound='viewer_poll')
 
@@ -266,8 +268,24 @@ def answer_interactive_poll_from_host(answer):
     if normalized_answer not in ['A', 'B', 'C', 'D']:
         return False
     index = current_poll_session.get('current_index', 0)
+    if index in current_poll_session.get('locked', set()):
+        return False
     current_poll_session.setdefault('answers', {})[index] = normalized_answer
     current_poll_session.setdefault('announced', set()).add(index)
+    broadcast_interactive_poll()
+    return True
+
+def lock_interactive_poll_answer_from_host(index=None):
+    if not current_poll_session:
+        return False
+    questions = current_poll_session.get('questions', [])
+    target_index = current_poll_session.get('current_index', 0) if index is None else index
+    if target_index < 0 or target_index >= len(questions):
+        return False
+    if target_index not in current_poll_session.get('answers', {}):
+        return False
+    current_poll_session.setdefault('locked', set()).add(target_index)
+    current_poll_session.setdefault('announced', set()).add(target_index)
     broadcast_interactive_poll()
     return True
 

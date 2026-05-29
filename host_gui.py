@@ -612,6 +612,10 @@ class PollControlWindow(tk.Toplevel):
         self.done_font = font.Font(family="Segoe UI", size=10, weight="bold", overstrike=1)
         self.question_buttons = []
         self.option_buttons = []
+        self.auto_lock_job = None
+        self.pending_lock_index = None
+        self.pending_lock_answer = None
+        self.auto_lock_remaining = 0
         self.build_widgets()
         self.refresh()
 
@@ -641,6 +645,16 @@ class PollControlWindow(tk.Toplevel):
         )
         self.current_label.pack(fill="x", pady=(0, 10))
 
+        self.lock_status_label = tk.Label(
+            container,
+            text="",
+            bg=HOST_BG,
+            fg=HOST_MUTED,
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        )
+        self.lock_status_label.pack(fill="x", pady=(0, 8))
+
         self.question_frame = tk.Frame(container, bg=HOST_BG)
         self.question_frame.pack(fill="both", expand=True)
 
@@ -663,12 +677,28 @@ class PollControlWindow(tk.Toplevel):
             button.pack(side=tk.LEFT, fill="x", expand=True, padx=4)
             self.option_buttons.append(button)
 
+        self.lock_button = tk.Button(
+            container,
+            text="Chốt đáp án poll / chọn back-up player",
+            command=self.lock_current_answer,
+            bg=HOST_GREEN,
+            fg="white",
+            activebackground="#1bbf80",
+            activeforeground="white",
+            relief=tk.FLAT,
+            font=("Segoe UI", 10, "bold"),
+            padx=12,
+            pady=9,
+        )
+        self.lock_button.pack(fill="x", pady=(10, 0))
+
     def refresh(self):
         state = server_logic.get_interactive_poll_state()
         questions = state.get('questions', [])
         current_index = state.get('current_index', 0)
         announced = set(state.get('announced', []))
         answers = state.get('answers', {})
+        locked = set(state.get('locked', []))
 
         for child in self.question_frame.winfo_children():
             child.destroy()
@@ -676,19 +706,31 @@ class PollControlWindow(tk.Toplevel):
 
         if not questions:
             self.current_label.config(text="Chưa có câu hỏi poll nào.")
+            self.lock_status_label.config(text="")
             for button in self.option_buttons:
                 button.config(state=tk.DISABLED)
+            self.lock_button.config(state=tk.DISABLED)
             return
 
         current_question = questions[current_index].get('question', '')
         current_answer = answers.get(str(current_index))
+        is_current_locked = current_index in locked
         status = f" | Khán giả chọn {current_answer}" if current_answer else ""
+        if is_current_locked:
+            status += " | ĐÃ CHỐT"
         self.current_label.config(text=f"Đang lên sóng câu {current_index + 1}: {current_question}{status}")
+        if is_current_locked:
+            self.lock_status_label.config(text="Đáp án poll đã chốt. Có thể dùng kết quả này để chọn back-up player.")
+        elif current_answer:
+            self.lock_status_label.config(text="Nếu không đổi đáp án, hệ thống sẽ tự chốt sau 10 giây.")
+        else:
+            self.lock_status_label.config(text="Chọn đáp án khán giả để bắt đầu đếm ngược chốt poll.")
 
         for index, question in enumerate(questions):
             answer = answers.get(str(index))
             was_announced = index in announced
-            prefix = "✓" if answer else ("↗" if index == current_index else ("•" if was_announced else "○"))
+            is_locked = index in locked
+            prefix = "CHỐT" if is_locked else ("✓" if answer else ("↗" if index == current_index else ("•" if was_announced else "○")))
             text = f"{prefix} Câu {index + 1}: {question.get('question', '')}"
             if answer:
                 text += f"  [{answer}]"
@@ -696,12 +738,12 @@ class PollControlWindow(tk.Toplevel):
                 self.question_frame,
                 text=text,
                 command=lambda value=index: self.select_question(value),
-                bg=self.question_bg(index, current_index, was_announced, answer),
+                bg=self.question_bg(index, current_index, was_announced, answer, is_locked),
                 fg="#09111f" if index == current_index and not answer else HOST_TEXT,
                 activebackground="#1b315d",
                 activeforeground=HOST_TEXT,
                 relief=tk.FLAT,
-                font=self.done_font if was_announced else self.normal_font,
+                font=self.done_font if (is_locked or was_announced) else self.normal_font,
                 anchor="w",
                 justify=tk.LEFT,
                 wraplength=500,
@@ -712,9 +754,12 @@ class PollControlWindow(tk.Toplevel):
             self.question_buttons.append(button)
 
         for button in self.option_buttons:
-            button.config(state=tk.NORMAL)
+            button.config(state=tk.DISABLED if is_current_locked else tk.NORMAL)
+        self.lock_button.config(state=tk.NORMAL if current_answer and not is_current_locked else tk.DISABLED)
 
-    def question_bg(self, index, current_index, was_announced, answer):
+    def question_bg(self, index, current_index, was_announced, answer, is_locked=False):
+        if is_locked:
+            return HOST_GREEN
         if answer:
             return "#274f3e"
         if index == current_index:
@@ -724,6 +769,7 @@ class PollControlWindow(tk.Toplevel):
         return HOST_PANEL_ALT
 
     def select_question(self, index):
+        self.cancel_auto_lock()
         if server_logic.select_interactive_poll_question_from_host(index):
             self.parent.log(f"Poll: công bố câu {index + 1}.")
         self.refresh()
@@ -731,9 +777,52 @@ class PollControlWindow(tk.Toplevel):
     def choose_answer(self, answer):
         if server_logic.answer_interactive_poll_from_host(answer):
             self.parent.log(f"Poll: khán giả chọn đáp án {answer}.")
+            state = server_logic.get_interactive_poll_state()
+            self.schedule_auto_lock(state.get('current_index', 0), answer)
+        self.refresh()
+
+    def schedule_auto_lock(self, index, answer):
+        self.cancel_auto_lock()
+        self.pending_lock_index = index
+        self.pending_lock_answer = answer
+        self.auto_lock_remaining = 10
+        self.update_auto_lock_countdown()
+
+    def update_auto_lock_countdown(self):
+        if self.pending_lock_index is None:
+            return
+        self.lock_status_label.config(
+            text=f"Tự chốt đáp án {self.pending_lock_answer} sau {self.auto_lock_remaining:02d} giây nếu không đổi."
+        )
+        if self.auto_lock_remaining <= 0:
+            self.auto_lock_job = None
+            self.lock_current_answer(auto=True)
+            return
+        self.auto_lock_remaining -= 1
+        self.auto_lock_job = self.after(1000, self.update_auto_lock_countdown)
+
+    def cancel_auto_lock(self):
+        if self.auto_lock_job:
+            try:
+                self.after_cancel(self.auto_lock_job)
+            except tk.TclError:
+                pass
+            self.auto_lock_job = None
+        self.pending_lock_index = None
+        self.pending_lock_answer = None
+        self.auto_lock_remaining = 0
+
+    def lock_current_answer(self, auto=False):
+        state = server_logic.get_interactive_poll_state()
+        index = state.get('current_index', 0) if self.pending_lock_index is None else self.pending_lock_index
+        if server_logic.lock_interactive_poll_answer_from_host(index):
+            self.cancel_auto_lock()
+            label = "tự chốt" if auto else "MC chốt"
+            self.parent.log(f"Poll: {label} đáp án câu {index + 1}. Có thể chọn back-up player.")
         self.refresh()
 
     def close(self):
+        self.cancel_auto_lock()
         self.parent.poll_window = None
         self.destroy()
 

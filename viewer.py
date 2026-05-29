@@ -516,6 +516,7 @@ class ViewerGUI(tk.Tk):
         current_index = int(payload.get('current_index', 0) or 0)
         announced = set(payload.get('announced', []))
         answers = payload.get('answers', {})
+        locked = set(payload.get('locked', []))
         if not questions:
             self.scene_message.config(text="Chưa tìm thấy câu hỏi tương tác trong pack dự phòng.")
             self.scene_message.pack(before=self.scene_countdown, fill="x", padx=80)
@@ -530,23 +531,27 @@ class ViewerGUI(tk.Tk):
             answer = answers.get(str(index))
             was_announced = index in announced
             is_current = index == current_index
-            bg = CURRENT_COLOR if is_current else ("#001B0A" if answer else ("#263a66" if was_announced else PANEL_BG))
-            fg = "#06122f" if is_current else ("#8ff0c5" if answer else TEXT_MUTED)
+            is_locked = index in locked
+            bg = "#00CC44" if is_locked else (CURRENT_COLOR if is_current else ("#001B0A" if answer else ("#263a66" if was_announced else PANEL_BG)))
+            fg = "#031507" if is_locked else ("#06122f" if is_current else ("#8ff0c5" if answer else TEXT_MUTED))
             text = f"Câu {index + 1}"
             if answer:
                 text += f"  {answer}"
+            if is_locked:
+                text += "  CHỐT"
             tk.Label(
                 progress,
                 text=text,
                 bg=bg,
                 fg=fg,
-                font=done_font if was_announced else active_font,
+                font=done_font if (is_locked or was_announced) else active_font,
                 padx=18,
                 pady=8,
             ).pack(side=tk.LEFT, padx=6)
 
         current_question = questions[current_index]
         selected_answer = answers.get(str(current_index))
+        is_current_locked = current_index in locked
         question_font = ("Segoe UI", 24, "bold overstrike") if selected_answer else ("Segoe UI", 24, "bold")
         tk.Label(
             self.poll_scene_frame,
@@ -571,9 +576,9 @@ class ViewerGUI(tk.Tk):
             row, column = divmod(position, 2)
             is_selected = selected_answer == key
             is_dimmed = selected_answer and not is_selected
-            bg = CURRENT_COLOR if is_selected else ("#24304c" if is_dimmed else PANEL_BG)
+            bg = ("#00CC44" if is_current_locked else CURRENT_COLOR) if is_selected else ("#24304c" if is_dimmed else PANEL_BG)
             fg = "#06122f" if is_selected else ("#93a4cf" if is_dimmed else "#ffffff")
-            border = CURRENT_COLOR if is_selected else PANEL_BORDER
+            border = ("#00CC44" if is_current_locked else CURRENT_COLOR) if is_selected else PANEL_BORDER
             tk.Label(
                 options_frame,
                 text=f"{key}. {options.get(key, '')}",
@@ -590,11 +595,16 @@ class ViewerGUI(tk.Tk):
             ).grid(row=row, column=column, sticky="ew", padx=8, pady=8)
 
         if selected_answer:
+            final_text = (
+                f"ĐÁP ÁN POLL ĐÃ CHỐT: {selected_answer} - CHỌN BACK-UP PLAYER"
+                if is_current_locked else
+                f"Khán giả đang chọn đáp án {selected_answer}"
+            )
             tk.Label(
                 self.poll_scene_frame,
-                text=f"Khán giả chọn đáp án {selected_answer}",
+                text=final_text,
                 bg="#020817",
-                fg=CURRENT_COLOR,
+                fg="#00CC44" if is_current_locked else CURRENT_COLOR,
                 font=("Segoe UI", 24, "bold"),
             ).pack(fill="x", pady=(20, 0))
 
