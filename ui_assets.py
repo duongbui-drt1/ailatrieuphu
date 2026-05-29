@@ -42,9 +42,11 @@ def load_lozenge_photo(size=(450, 60), state="normal", radius=None):
 
 
 def load_background_source():
-    path = image_path("background.png", "background.jpg")
-    if not path.exists():
+    candidates = [image_path(name) for name in ("background.png", "background.jpg", "background.jpeg")]
+    existing = [path for path in candidates if path.exists()]
+    if not existing:
         return None
+    path = max(existing, key=lambda candidate: candidate.stat().st_mtime)
     return Image.open(path).convert("RGB")
 
 

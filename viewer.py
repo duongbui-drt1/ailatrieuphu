@@ -96,11 +96,13 @@ class ViewerGUI(tk.Tk):
         )
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
-        prize_frame = tk.Frame(self.canvas, bg="#050b23", highlightthickness=1, highlightbackground="#243b78")
-        prize_frame.place(relx=0.75, rely=0, relwidth=0.25, relheight=1)
+        self.prize_frame = tk.Frame(self.canvas, bg="#050b23", highlightthickness=1, highlightbackground="#243b78")
+        self.prize_frame.place(relx=0.75, rely=0, relwidth=0.25, relheight=1)
+        self.prize_background_label = tk.Label(self.prize_frame, bd=0)
+        self.prize_background_label.place(x=0, y=0, relwidth=1, relheight=1)
 
         tk.Label(
-            prize_frame,
+            self.prize_frame,
             text="MỐC THƯỞNG",
             font=("Segoe UI", 15, "bold"),
             fg=PANEL_BORDER,
@@ -111,7 +113,7 @@ class ViewerGUI(tk.Tk):
         self.prize_labels = []
         for i, prize in enumerate(PRIZE_LEVELS):
             label = tk.Label(
-                prize_frame,
+                self.prize_frame,
                 text=f"{15 - i:2d}  ♦  {prize}",
                 image=self.prize_row_images["normal"],
                 compound=tk.CENTER,
@@ -124,10 +126,12 @@ class ViewerGUI(tk.Tk):
             label.pack(fill='x', padx=14, pady=2)
             self.prize_labels.append(label)
 
-        main_frame = tk.Frame(self.canvas, bg=WIDGET_BG)
-        main_frame.place(relx=0, rely=0, relwidth=0.75, relheight=1)
+        self.main_frame = tk.Frame(self.canvas, bg=WIDGET_BG)
+        self.main_frame.place(relx=0, rely=0, relwidth=0.75, relheight=1)
+        self.main_background_label = tk.Label(self.main_frame, bd=0)
+        self.main_background_label.place(x=0, y=0, relwidth=1, relheight=1)
 
-        header_frame = tk.Frame(main_frame, bg=WIDGET_BG)
+        header_frame = tk.Frame(self.main_frame, bg=WIDGET_BG)
         header_frame.place(relx=0.04, rely=0.035, relwidth=0.92, height=88)
 
         if self.logo_image:
@@ -152,7 +156,9 @@ class ViewerGUI(tk.Tk):
             anchor="w",
         ).pack(fill="x", pady=(2, 0))
 
-        self.game_area = tk.Frame(main_frame, bg=WIDGET_BG)
+        self.game_area = tk.Frame(self.main_frame, bg=WIDGET_BG)
+        self.game_background_label = tk.Label(self.game_area, bd=0)
+        self.game_background_label.place(x=0, y=0, relwidth=1, relheight=1)
         self.lbl_question = tk.Label(
             self.game_area,
             text="...",
@@ -195,7 +201,7 @@ class ViewerGUI(tk.Tk):
             self.option_positions[option] = {'relx': relx, 'rely': rely}
 
         self.overlay_frame = tk.Frame(
-            main_frame,
+            self.main_frame,
             bg=PANEL_BG,
             highlightthickness=2,
             highlightbackground=PANEL_BORDER,
@@ -260,6 +266,42 @@ class ViewerGUI(tk.Tk):
         )
         self.canvas.create_image(0, 0, image=self.gradient_image, anchor="nw", tags="gradient")
         self.canvas.tag_lower("gradient")
+        self.update_panel_backgrounds(width, height)
+
+    def update_panel_backgrounds(self, width, height):
+        if not hasattr(self, "main_background_label"):
+            return
+
+        main_width = max(1, int(width * 0.75))
+        prize_width = max(1, width - main_width)
+        game_height = max(1, int(height * 0.74))
+
+        self.main_background_image = render_background(
+            self.background_source,
+            (main_width, height),
+            GRADIENT_START,
+            GRADIENT_END,
+        )
+        self.main_background_label.config(image=self.main_background_image)
+        self.main_background_label.lower()
+
+        self.game_background_image = render_background(
+            self.background_source,
+            (main_width, game_height),
+            GRADIENT_START,
+            GRADIENT_END,
+        )
+        self.game_background_label.config(image=self.game_background_image)
+        self.game_background_label.lower()
+
+        self.prize_background_image = render_background(
+            self.background_source,
+            (prize_width, height),
+            GRADIENT_START,
+            GRADIENT_END,
+        )
+        self.prize_background_label.config(image=self.prize_background_image)
+        self.prize_background_label.lower()
 
     def show_overlay(self, message):
         """Hiển thị một lớp phủ với thông báo."""

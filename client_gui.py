@@ -95,6 +95,8 @@ class GameClientGUI(tk.Toplevel):
 
         self.prize_frame = tk.Frame(self.canvas, bg="#050b23", highlightthickness=1, highlightbackground="#243b78")
         self.prize_frame.place(relx=0.75, rely=0, relwidth=0.25, relheight=1)
+        self.prize_background_label = tk.Label(self.prize_frame, bd=0)
+        self.prize_background_label.place(x=0, y=0, relwidth=1, relheight=1)
 
         tk.Label(
             self.prize_frame,
@@ -123,6 +125,8 @@ class GameClientGUI(tk.Toplevel):
 
         self.main_frame = tk.Frame(self.canvas, bg=WIDGET_BG)
         self.main_frame.place(relx=0, rely=0, relwidth=0.75, relheight=1)
+        self.main_background_label = tk.Label(self.main_frame, bd=0)
+        self.main_background_label.place(x=0, y=0, relwidth=1, relheight=1)
 
         self.header_frame = tk.Frame(self.main_frame, bg=WIDGET_BG)
         self.header_frame.place(relx=0.04, rely=0.035, relwidth=0.92, height=88)
@@ -151,6 +155,8 @@ class GameClientGUI(tk.Toplevel):
 
         self.game_area = tk.Frame(self.main_frame, bg=WIDGET_BG)
         self.game_area.place(relx=0.5, rely=0.58, anchor=tk.CENTER, relwidth=1, relheight=0.74)
+        self.game_background_label = tk.Label(self.game_area, bd=0)
+        self.game_background_label.place(x=0, y=0, relwidth=1, relheight=1)
 
         self.lbl_question = tk.Label(self.game_area, text="...", image=self.question_panel_image,
                                    compound=tk.CENTER, font=("Arial", 20, "bold"),
@@ -234,6 +240,42 @@ class GameClientGUI(tk.Toplevel):
         )
         self.canvas.create_image(0, 0, image=self.gradient_image, anchor="nw", tags="gradient")
         self.canvas.tag_lower("gradient")
+        self.update_panel_backgrounds(width, height)
+
+    def update_panel_backgrounds(self, width, height):
+        if not hasattr(self, "main_background_label"):
+            return
+
+        main_width = max(1, int(width * 0.75))
+        prize_width = max(1, width - main_width)
+        game_height = max(1, int(height * 0.74))
+
+        self.main_background_image = render_background(
+            self.background_source,
+            (main_width, height),
+            GRADIENT_START,
+            GRADIENT_END,
+        )
+        self.main_background_label.config(image=self.main_background_image)
+        self.main_background_label.lower()
+
+        self.game_background_image = render_background(
+            self.background_source,
+            (main_width, game_height),
+            GRADIENT_START,
+            GRADIENT_END,
+        )
+        self.game_background_label.config(image=self.game_background_image)
+        self.game_background_label.lower()
+
+        self.prize_background_image = render_background(
+            self.background_source,
+            (prize_width, height),
+            GRADIENT_START,
+            GRADIENT_END,
+        )
+        self.prize_background_label.config(image=self.prize_background_image)
+        self.prize_background_label.lower()
 
     def show_overlay(self, message, show_ready_btn=False, show_return_btn=False):
         self.game_area.place_forget()
