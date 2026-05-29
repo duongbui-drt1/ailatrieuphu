@@ -213,6 +213,7 @@ class ViewerGUI(tk.Tk):
             justify=tk.CENTER,
         )
         self.scene_message.pack(fill="x", padx=80)
+        self.prize_scene_frame = tk.Frame(self.scene_frame, bg="#020817")
         self.scene_countdown = tk.Label(
             self.scene_frame,
             text="",
@@ -275,6 +276,7 @@ class ViewerGUI(tk.Tk):
             self.after_cancel(self.scene_countdown_job)
             self.scene_countdown_job = None
         self.stop_credit_animation()
+        self.hide_prize_scene_board()
         self.scene_frame.place_forget()
 
     def stop_credit_animation(self):
@@ -293,28 +295,55 @@ class ViewerGUI(tk.Tk):
     def stop_scene_audio(self):
         self.audio_manager.stop_all()
 
-    def play_final_audio(self):
+    def play_final_audio(self, is_win, with_buzzer=False):
         self.audio_manager.stop_all()
-        if self.audio_manager.has_sound('end_buzzer'):
+        if with_buzzer and self.audio_manager.has_sound('end_buzzer'):
             self.audio_manager.play('end_buzzer')
-            self.after(1200, self.play_program_end_audio)
+            self.after(1200, lambda: self.play_program_end_audio(is_win))
         else:
-            self.play_program_end_audio()
+            self.play_program_end_audio(is_win)
 
-    def play_program_end_audio(self):
-        if self.audio_manager.has_sound('program_end'):
+    def play_program_end_audio(self, is_win=True):
+        if is_win and self.audio_manager.has_sound('complete'):
+            self.audio_manager.play('complete')
+        elif is_win and self.audio_manager.has_sound('program_end'):
             self.audio_manager.play('program_end')
+        elif is_win:
+            self.audio_manager.play('win')
+        else:
+            self.audio_manager.play('end_game')
 
     def credit_lines_from_payload(self, payload):
         lines = payload.get('lines') or [
-            "Duli Production DLV",
+            "CHƯƠNG TRÌNH ĐƯỢC ĐẦU TƯ VÀ SẢN XUẤT BỞI DULI PRODUCTION LLC.",
+            "",
             "Đạo diễn chương trình: Duong Bui",
-            "Dẫn chương trình: MC",
-            "Thí sinh ghế nóng",
-            "Khán giả trường quay",
-            "Kỹ thuật hình ảnh - âm thanh - mạng LAN",
-            "Biên tập câu hỏi và kiểm duyệt nội dung",
-            "Cảm ơn mọi người đã theo dõi",
+            "",
+            "Dẫn chương trình: MC Hải Dương",
+            "",
+            "Kỹ thuật hình ảnh - âm thanh - mạng LAN: Duli Production Team, Duli Studio",
+            "",
+            "Biên tập câu hỏi và kiểm duyệt nội dung: Duli Production Team",
+            "",
+            "Đội ngũ hỗ trợ kỹ thuật và vận hành: Hoàng Long",
+            "",
+            "Đội ngũ thiết kế đồ họa và hiệu ứng: Duli Studio",
+            "",
+            "Âm nhạc nền: Bùi Công Duy, Nguyễn Hữu Phúc, Nguyễn Văn Huy",
+            "",
+            "Đội ngũ truyền thông và marketing: Duli Production Team",
+            "",
+            "Đội ngũ sản xuất và hậu kỳ: Duli Production Team",
+            "",
+            "Đặc biệt cảm ơn sự ủng hộ của khán giả và người chơi đã làm nên thành công của chương trình Ai Là Triệu Phú!",
+            "",
+            "Mọi thắc mắc về chương trình và đăng ký tham gia xin vui lòng liên hệ:",
+            "",
+            "Email: dulicontact.ctme@gmail.com",
+            "",
+            "Fanpage: https://www.facebook.com/duliproduction",
+            "",
+            "Copyright © 2026 Duli Production LLC & Sony Pictures. All rights reserved.",
         ]
         return [line for line in lines if line]
 
@@ -326,18 +355,80 @@ class ViewerGUI(tk.Tk):
         colors = [PANEL_BORDER, "#ffffff", "#8ff0c5"]
 
         def animate(step=0):
-            window_size = min(6, len(lines))
-            start = step % len(lines)
-            visible = [lines[(start + offset) % len(lines)] for offset in range(window_size)]
-            formatted = []
-            for offset, line in enumerate(visible):
-                prefix = "◆" if offset == 0 else " "
-                formatted.append(f"{prefix} {line}")
+            line = lines[step % len(lines)]
             self.scene_title.config(fg=colors[step % len(colors)])
-            self.scene_message.config(text="\n".join(formatted))
-            self.credit_animation_job = self.after(950, lambda: animate(step + 1))
+            self.scene_message.config(text=f"◆\n{line}")
+            self.credit_animation_job = self.after(1350, lambda: animate(step + 1))
 
         animate()
+
+    def hide_prize_scene_board(self):
+        for child in self.prize_scene_frame.winfo_children():
+            child.destroy()
+        self.prize_scene_frame.pack_forget()
+        if not self.scene_message.winfo_manager():
+            self.scene_message.pack(before=self.scene_countdown, fill="x", padx=80)
+
+    def show_prize_scene_board(self):
+        if self.scene_message.winfo_manager():
+            self.scene_message.pack_forget()
+        for child in self.prize_scene_frame.winfo_children():
+            child.destroy()
+
+        lifeline_row = tk.Frame(self.prize_scene_frame, bg="#020817")
+        lifeline_row.pack(fill="x", pady=(0, 12))
+        for key, label in [
+            ("5050", "50:50"),
+            ("audience", "KHÁN GIẢ"),
+            ("call", "GỌI ĐIỆN"),
+            ("wise_man", "TƯ VẤN"),
+        ]:
+            available = self.current_lifelines_state.get(key, True)
+            locked = key == "wise_man" and self.current_level < 6 and available
+            status = "KHÓA" if locked else ("OK" if available else "X")
+            bg = "#26304a" if locked else ("#12346f" if available else "#64192b")
+            fg = TEXT_MUTED if locked else ("#8ff0c5" if available else "#ff9caf")
+            tk.Label(
+                lifeline_row,
+                text=f"{label}  {status}",
+                bg=bg,
+                fg=fg,
+                font=("Segoe UI", 12, "bold"),
+                padx=14,
+                pady=7,
+            ).pack(side=tk.LEFT, padx=5)
+
+        board = tk.Frame(self.prize_scene_frame, bg="#020817")
+        board.pack(fill="both", expand=True)
+        for index, prize in enumerate(PRIZE_LEVELS):
+            level = 15 - index
+            is_current = level == self.current_level
+            is_passed = level < self.current_level
+            is_milestone = level in [5, 10, 15]
+            bg = CURRENT_COLOR if is_current else "#07143a"
+            fg = "#06122f" if is_current else (PASSED_PRIZE_COLOR if is_passed else (MILESTONE_COLOR if is_milestone else DEFAULT_PRIZE_COLOR))
+            mark_fg = "#06122f" if is_current else (PANEL_BORDER if is_milestone else "#8bb4ff")
+            row = tk.Frame(board, bg=bg, highlightthickness=1, highlightbackground=PANEL_BORDER if is_current else "#1a2c61")
+            row.pack(fill="x", pady=1)
+            tk.Label(row, text="▶" if is_current else " ", bg=bg, fg=fg, width=2, font=("Segoe UI", 13, "bold")).pack(side=tk.LEFT)
+            tk.Label(row, text=f"{level:02d}", bg=bg, fg=fg, width=4, font=("Consolas", 16, "bold")).pack(side=tk.LEFT)
+            tk.Label(row, text="◆", bg=bg, fg=mark_fg, width=2, font=("Segoe UI", 13, "bold")).pack(side=tk.LEFT)
+            tk.Label(row, text=f"{prize} VNĐ", bg=bg, fg=fg, font=("Consolas", 17, "bold"), anchor="w").pack(side=tk.LEFT, fill="x", expand=True, padx=(8, 14), pady=3)
+
+        self.prize_scene_frame.pack(before=self.scene_countdown, fill="both", expand=True, padx=180, pady=(0, 14))
+
+    def poll_scene_text(self, intro, questions):
+        lines = [intro] if intro else []
+        if not questions:
+            lines.append("Chưa tìm thấy câu hỏi tương tác trong pack dự phòng.")
+            return "\n".join(lines)
+
+        for index, question in enumerate(questions, 1):
+            options = question.get('options', {})
+            lines.append(f"{index}. {question.get('question', '')}")
+            lines.append(f"   A. {options.get('A', '')}    B. {options.get('B', '')}")
+            lines.append(f"   C. {options.get('C', '')}    D. {options.get('D', '')}")
+        return "\n".join(lines)
 
     def show_viewer_scene(self, data):
         scene = data.get('scene', 'standby')
@@ -346,6 +437,7 @@ class ViewerGUI(tk.Tk):
         payload = data.get('payload', {})
         stats = data.get('stats', {})
         self.stop_credit_animation()
+        self.hide_prize_scene_board()
         self.scene_title.config(font=("Segoe UI", 34, "bold"))
         self.scene_message.config(font=("Segoe UI", 22), justify=tk.CENTER)
         if scene in ['prize', 'credits']:
@@ -374,8 +466,7 @@ class ViewerGUI(tk.Tk):
             self.scene_countdown.config(bg="#020817", fg=PANEL_BORDER)
 
         if scene == 'prize':
-            message = self.prize_scene_text()
-            self.scene_message.config(font=("Consolas", 18, "bold"), justify=tk.LEFT)
+            message = ""
         elif scene == 'stats':
             fastest = stats.get('fastest_ping')
             fastest_text = f"{fastest:.0f}ms" if fastest is not None else "N/A"
@@ -390,8 +481,8 @@ class ViewerGUI(tk.Tk):
             self.scene_title.config(font=("Segoe UI", 42, "bold"))
             self.scene_message.config(font=("Segoe UI", 24, "bold"), justify=tk.CENTER)
         elif scene == 'poll':
-            choices = payload.get('choices', [])
-            message = message + "\n\n" + "   ".join(choices)
+            message = self.poll_scene_text(message, payload.get('questions', []))
+            self.scene_message.config(font=("Segoe UI", 17, "bold"), justify=tk.LEFT)
         elif scene == 'mini_quiz':
             message = message + "\n\nHãy giữ câu trả lời của bạn cho phần quay lại."
 
@@ -399,6 +490,8 @@ class ViewerGUI(tk.Tk):
         self.overlay_frame.place_forget()
         self.scene_title.config(text=title)
         self.scene_message.config(text=message)
+        if scene == 'prize':
+            self.show_prize_scene_board()
         self.scene_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
         self.scene_frame.tkraise()
         self.start_scene_countdown(data.get('countdown_seconds', 0))
@@ -525,6 +618,8 @@ class ViewerGUI(tk.Tk):
                 self.show_overlay("GAME TẠM DỪNG BỞI HOST")
             else:
                 self.hide_overlay()
+        elif msg_type == 'play_effect':
+            self.audio_manager.play(data.get('name', 'end_buzzer'))
         elif msg_type == 'win':
             self.show_final_scene(data, True)
         elif msg_type == 'game_over':
@@ -621,7 +716,7 @@ class ViewerGUI(tk.Tk):
 
     def show_final_scene(self, data, is_win):
         self.final_scene_active = True
-        self.play_final_audio()
+        self.play_final_audio(is_win)
         player_name = data.get('player_name', 'Thí sinh')
         prize = data.get('prize', '0')
         title = "CHÚC MỪNG HOÀN THÀNH PHẦN THI" if is_win else "PHẦN THI KẾT THÚC"

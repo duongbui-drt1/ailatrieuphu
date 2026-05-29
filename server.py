@@ -31,6 +31,7 @@ is_game_paused = False
 current_game_state_packet = None
 current_viewer_scene_packet = None
 current_question_index = None
+active_question_pack_path = None
 current_stats = {
     'questions_seen': 0,
     'correct_answers': 0,
@@ -46,14 +47,35 @@ pending_answer = None
 pending_answer_level = 0
 
 CREDIT_LINES = [
-    "Duli Production DLV",
+    "CHƯƠNG TRÌNH ĐƯỢC ĐẦU TƯ VÀ SẢN XUẤT BỞI DULI PRODUCTION LLC.",
+    "",
     "Đạo diễn chương trình: Duong Bui",
-    "Dẫn chương trình: MC",
-    "Thí sinh ghế nóng",
-    "Khán giả trường quay",
-    "Kỹ thuật hình ảnh - âm thanh - mạng LAN",
-    "Biên tập câu hỏi và kiểm duyệt nội dung",
-    "Cảm ơn mọi người đã theo dõi",
+    "",
+    "Dẫn chương trình: MC Hải Dương",
+    "",
+    "Kỹ thuật hình ảnh - âm thanh - mạng LAN: Duli Production Team, Duli Studio",
+    "",
+    "Biên tập câu hỏi và kiểm duyệt nội dung: Duli Production Team",
+    "",
+    "Đội ngũ hỗ trợ kỹ thuật và vận hành: Hoàng Long",
+    "",
+    "Đội ngũ thiết kế đồ họa và hiệu ứng: Duli Studio",
+    "",
+    "Âm nhạc nền: Bùi Công Duy, Nguyễn Hữu Phúc, Nguyễn Văn Huy",
+    "",
+    "Đội ngũ truyền thông và marketing: Duli Production Team",
+    "",
+    "Đội ngũ sản xuất và hậu kỳ: Duli Production Team",
+    "",
+    "Đặc biệt cảm ơn sự ủng hộ của khán giả và người chơi đã làm nên thành công của chương trình Ai Là Triệu Phú!",
+    "",
+    "Mọi thắc mắc về chương trình và đăng ký tham gia xin vui lòng liên hệ:",
+    "",
+    "Email: dulicontact.ctme@gmail.com",
+    "",
+    "Fanpage: https://www.facebook.com/duliproduction",
+    "",
+    "Copyright © 2026 Duli Production LLC & Sony Pictures. All rights reserved.",
 ]
 
 def set_game_update_callback(callback):
@@ -188,6 +210,10 @@ def stop_client_music_from_host():
     broadcast({'type': 'stop_music'})
     return True
 
+def play_effect_from_host(name):
+    broadcast({'type': 'play_effect', 'name': name})
+    return True
+
 def end_program_from_host():
     global is_game_paused
     is_game_paused = True
@@ -264,6 +290,47 @@ def swap_current_question_from_host():
         chosen['answer'],
     )
 
+def get_interactive_poll_questions(count=3):
+    current_text = ""
+    if current_question_index is not None and 0 <= current_question_index < len(QUESTIONS):
+        current_text = QUESTIONS[current_question_index].get('question', '')
+
+    pack_paths = question_pack_paths()
+    inactive_packs = []
+    for pack_path in pack_paths:
+        if active_question_pack_path is None:
+            inactive_packs.append(pack_path)
+            continue
+        try:
+            if pack_path.resolve() != active_question_pack_path.resolve():
+                inactive_packs.append(pack_path)
+        except OSError:
+            inactive_packs.append(pack_path)
+
+    candidates = []
+    for pack_path in inactive_packs or pack_paths:
+        try:
+            with open(pack_path, 'r', encoding='utf-8') as file:
+                pack_questions = json.load(file)
+        except Exception:
+            continue
+
+        for question in pack_questions:
+            text = str(question.get('question', '')).strip()
+            options = question.get('options', {})
+            if not text or text == current_text or not isinstance(options, dict):
+                continue
+            if not all(str(options.get(key, '')).strip() for key in ['A', 'B', 'C', 'D']):
+                continue
+            candidates.append({
+                'level': question.get('level', 0),
+                'question': text,
+                'options': {key: str(options.get(key, '')).strip() for key in ['A', 'B', 'C', 'D']},
+            })
+
+    random.shuffle(candidates)
+    return candidates[:count]
+
 def set_waiting_for_ready(level):
     global waiting_for_ready_level
     with host_control_lock:
@@ -301,7 +368,7 @@ def final_prize_on_wrong(level, current_prize):
     return "0"
 
 def load_random_question_pack():
-    global QUESTIONS
+    global QUESTIONS, active_question_pack_path
     try:
         question_files = question_pack_paths()
         if not question_files:
@@ -311,6 +378,7 @@ def load_random_question_pack():
         chosen_pack = random.choice(question_files)
         with open(chosen_pack, 'r', encoding='utf-8') as f:
             QUESTIONS = json.load(f)
+        active_question_pack_path = chosen_pack
         update_host_gui({'type': 'log', 'message': f"Đã tải ngẫu nhiên gói câu hỏi: '{chosen_pack.name}'."})
         return True
     except Exception as e:
@@ -505,10 +573,11 @@ def handle_client(conn, addr, player_info):
                         update_host_gui({'type': 'audience_request'})
                     elif lifeline_type == 'call' and game_state['lifelines']['call']:
                         game_state['lifelines']['call'] = False
-                        wrong_answers = [key for key in q_data['options'] if key != q_data['answer']]
-                        suggested_answer = q_data['answer'] if random.random() < 0.5 else random.choice(wrong_answers)
-                        advice = f"Chuyên gia nghiêng về đáp án {suggested_answer}"
-                        broadcast({'type': 'lifeline_result', 'lifeline': 'call', 'message': advice})
+                        update_host_gui({
+                            'type': 'call_request',
+                            'question': q_data['question'],
+                            'answer': q_data['answer'],
+                        })
                     elif lifeline_type == 'wise_man' and game_state['lifelines']['wise_man'] and game_state['level'] >= 5:
                         game_state['lifelines']['wise_man'] = False
                         wrong_answers = [key for key in q_data['options'] if key != q_data['answer']]

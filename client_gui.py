@@ -489,6 +489,8 @@ class GameClientGUI(tk.Toplevel):
                 message = "CHƯƠNG TRÌNH ĐÃ KẾT THÚC\nClient đang ở chế độ tạm dừng." if data.get('reason') == 'program_end' else "GAME TẠM DỪNG BỞI HOST"
                 self.show_overlay(message)
                 self.audio_manager.stop_all()
+                if data.get('reason') == 'program_end':
+                    self.play_program_end_audio()
             else:
                 self.hide_overlay()
                 self.play_music_by_level()
@@ -502,6 +504,8 @@ class GameClientGUI(tk.Toplevel):
             self.audio_manager.play(data.get('name', 'wait_11_15'), loop=data.get('loop', True))
         elif msg_type == 'stop_music':
             self.audio_manager.stop_all()
+        elif msg_type == 'play_effect':
+            self.audio_manager.play(data.get('name', 'end_buzzer'))
         elif msg_type == 'server_busy':
             messagebox.showerror("Server bận", data.get('message', 'Đã có thí sinh đang chơi.'))
             self.on_closing()
@@ -572,8 +576,10 @@ class GameClientGUI(tk.Toplevel):
         self.current_lifelines_state[lifeline_type] = False
         self.set_visible_answer_buttons_state("disabled")
         self.update_lifeline_buttons()
-        self.status_bar.config(text="Đã chọn trợ giúp. Đang chạy hiệu ứng 5 giây trước khi mở kết quả...")
-        self.pending_lifeline_job = self.after(5000, lambda: self.send_lifeline_request(lifeline_type))
+        delay_ms = 2000 if lifeline_type == 'audience' else 5000
+        delay_seconds = delay_ms // 1000
+        self.status_bar.config(text=f"Đã chọn trợ giúp. Đang chạy hiệu ứng {delay_seconds} giây trước khi mở kết quả...")
+        self.pending_lifeline_job = self.after(delay_ms, lambda: self.send_lifeline_request(lifeline_type))
 
     def send_data(self, data):
         try:
@@ -590,18 +596,24 @@ class GameClientGUI(tk.Toplevel):
         self.show_overlay(message, show_return_btn=True)
         self.start_final_animation(is_win)
 
-    def play_final_audio(self, is_win):
+    def play_program_end_audio(self):
+        if self.audio_manager.has_sound('program_end'):
+            self.audio_manager.play('program_end')
+        elif self.audio_manager.has_sound('end_game'):
+            self.audio_manager.play('end_game')
+
+    def play_final_audio(self, is_win, with_buzzer=False):
         self.audio_manager.stop_all()
         delay = 0
-        if self.audio_manager.has_sound('end_buzzer'):
+        if with_buzzer and self.audio_manager.has_sound('end_buzzer'):
             self.audio_manager.play('end_buzzer')
             delay = 1200
 
         def play_main_theme():
-            if self.audio_manager.has_sound('program_end'):
-                self.audio_manager.play('program_end')
-            elif is_win and self.audio_manager.has_sound('complete'):
+            if is_win and self.audio_manager.has_sound('complete'):
                 self.audio_manager.play('complete')
+            elif is_win and self.audio_manager.has_sound('program_end'):
+                self.audio_manager.play('program_end')
             elif is_win:
                 self.audio_manager.play('win')
             else:

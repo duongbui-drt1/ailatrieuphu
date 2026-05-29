@@ -5,6 +5,10 @@ import time
 import os
 import random
 import server as server_logic
+try:
+    from ui_assets import load_logo_photo
+except ImportError:
+    load_logo_photo = None
 
 HOST_BG = "#07101f"
 HOST_PANEL = "#0d1930"
@@ -29,6 +33,7 @@ class HostGUI(tk.Tk):
         self.log_font = font.Font(family="Consolas", size=10)
         self.current_level = 0
         self.is_client_muted = False
+        self.logo_image = self.load_logo_image()
 
         self.create_widgets()
         self.bind_hotkeys()
@@ -36,6 +41,14 @@ class HostGUI(tk.Tk):
         server_logic.set_game_update_callback(self.queue_gui_update)
         self.server_thread = threading.Thread(target=server_logic.start_server_logic, daemon=True)
         self.server_thread.start()
+
+    def load_logo_image(self):
+        if not load_logo_photo:
+            return None
+        try:
+            return load_logo_photo((58, 58))
+        except Exception:
+            return None
 
     def create_widgets(self):
         main_frame = tk.Frame(self, bg=HOST_BG, padx=18, pady=16)
@@ -45,7 +58,11 @@ class HostGUI(tk.Tk):
 
         header = tk.Frame(main_frame, bg=HOST_BG)
         header.grid(row=0, column=0, sticky="ew", pady=(0, 14))
-        header.grid_columnconfigure(0, weight=1)
+        title_column = 1 if self.logo_image else 0
+        header.grid_columnconfigure(title_column, weight=1)
+
+        if self.logo_image:
+            tk.Label(header, image=self.logo_image, bg=HOST_BG).grid(row=0, column=0, rowspan=2, sticky="w", padx=(0, 12))
 
         tk.Label(
             header,
@@ -54,7 +71,7 @@ class HostGUI(tk.Tk):
             bg=HOST_BG,
             fg=HOST_TEXT,
             anchor="w",
-        ).grid(row=0, column=0, sticky="w")
+        ).grid(row=0, column=title_column, sticky="w")
         self.lbl_server_status = tk.Label(
             header,
             text="SERVER ĐANG KHỞI ĐỘNG",
@@ -64,7 +81,7 @@ class HostGUI(tk.Tk):
             padx=14,
             pady=6,
         )
-        self.lbl_server_status.grid(row=0, column=1, sticky="e")
+        self.lbl_server_status.grid(row=0, column=title_column + 1, sticky="e")
         tk.Label(
             header,
             text="Phòng điều khiển game show",
@@ -72,7 +89,7 @@ class HostGUI(tk.Tk):
             bg=HOST_BG,
             fg=HOST_MUTED,
             anchor="w",
-        ).grid(row=1, column=0, sticky="w", pady=(4, 0))
+        ).grid(row=1, column=title_column, sticky="w", pady=(4, 0))
 
         status_frame = tk.Frame(main_frame, bg=HOST_BG)
         status_frame.grid(row=1, column=0, sticky="ew")
@@ -180,6 +197,7 @@ class HostGUI(tk.Tk):
             ("Nhạc căng", self.play_tension_music),
             ("Dừng nhạc", self.stop_client_music),
         ])
+        self.create_control_button(control_frame, "Phát còi kết thúc", self.play_end_buzzer, bg="#5f2940").pack(fill="x", pady=5)
 
         self.add_group_label(control_frame, "GHI CHÚ MC")
         self.mc_notes = tk.Text(
@@ -327,7 +345,7 @@ class HostGUI(tk.Tk):
         self.log("Viewer: quay lại màn game.")
 
     def show_prize_scene(self):
-        server_logic.set_viewer_scene('prize', 'BẢNG TIỀN THƯỞNG', 'Các mốc giải thưởng của chương trình', sound='viewer_prize')
+        server_logic.set_viewer_scene('prize', 'BẢNG TIỀN THƯỞNG', 'Các mốc giải thưởng của chương trình', sound='viewer_stats')
         self.log("Viewer: hiện bảng tiền thưởng.")
 
     def show_break_scene(self):
@@ -400,14 +418,15 @@ class HostGUI(tk.Tk):
         self.log("Viewer: hiện mini quiz.")
 
     def show_poll_scene(self):
+        questions = server_logic.get_interactive_poll_questions(3)
         server_logic.set_viewer_scene(
             'poll',
-            'DỰ ĐOÁN KHÁN GIẢ',
-            'Thí sinh sẽ trả lời đúng câu này chứ?',
-            payload={'choices': ['Sẽ đúng', 'Có thể sai', 'Cần trợ giúp']},
+            'FASTEST FINGER FIRST',
+            'Câu hỏi tương tác dành cho khán giả',
+            payload={'questions': questions},
             sound='viewer_poll',
         )
-        self.log("Viewer: hiện poll dự đoán.")
+        self.log(f"Viewer: hiện poll tương tác FFF ({len(questions)} câu).")
 
     def play_tension_music(self):
         server_logic.play_client_music_from_host('wait_11_15')
@@ -416,6 +435,10 @@ class HostGUI(tk.Tk):
     def stop_client_music(self):
         server_logic.stop_client_music_from_host()
         self.log("Đã dừng nhạc client.")
+
+    def play_end_buzzer(self):
+        server_logic.play_effect_from_host('end_buzzer')
+        self.log("Đã phát còi kết thúc theo lệnh host.")
 
     def edit_current_question(self):
         snapshot = server_logic.get_current_question_snapshot()
@@ -514,6 +537,8 @@ class HostGUI(tk.Tk):
             self.handle_wise_man_request(data['question'], data['answer'])
         elif msg_type == 'audience_request':
             self.handle_audience_request()
+        elif msg_type == 'call_request':
+            self.handle_call_request(data['question'], data['answer'])
 
     def handle_audience_request(self):
         self.log("Chờ 2 giây cho nhạc hiệu hỏi khán giả, sau đó mở bộ đếm 30 giây...")
@@ -529,6 +554,18 @@ class HostGUI(tk.Tk):
         else:
             server_logic.broadcast({'type': 'lifeline_result', 'lifeline': 'audience', 'opinions': []})
             self.log("Đã hủy hoặc nhập sai ý kiến khán giả.")
+
+    def handle_call_request(self, question, answer):
+        self.log("Gọi điện: mở bộ đếm 30 giây để host nhập gợi ý.")
+        self.open_call_dialog(question, answer)
+
+    def open_call_dialog(self, question, answer):
+        self.log("Đang nhập gợi ý gọi điện trong 30 giây...")
+        dialog = CallDialog(self, question, answer)
+        suggestion = (dialog.result or "").strip()
+        message = f"Người được gọi gợi ý: {suggestion}" if suggestion else "Người được gọi không đưa ra được gợi ý."
+        server_logic.broadcast({'type': 'lifeline_result', 'lifeline': 'call', 'message': message})
+        self.log("Đã gửi gợi ý gọi điện cho thí sinh.")
 
     def handle_wise_man_request(self, question, answer):
         self.log("Đang chờ gợi ý từ Host cho Tổ Tư Vấn...")
@@ -587,6 +624,46 @@ class AudienceDialog(simpledialog.Dialog):
 
     def apply(self):
         self.result = [e.get().strip() for e in self.entries]
+
+class CallDialog(simpledialog.Dialog):
+    def __init__(self, parent, question, answer):
+        self.question = question
+        self.answer = answer
+        self.remaining_seconds = 30
+        self.timer_job = None
+        super().__init__(parent, "Gọi Điện Cho Người Thân")
+
+    def body(self, master):
+        tk.Label(master, text="Nhập gợi ý từ cuộc gọi 30 giây:", font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        tk.Label(master, text=f"Câu hỏi: {self.question}", wraplength=520, justify=tk.LEFT).pack(anchor="w", pady=(8, 2))
+        tk.Label(master, text=f"Đáp án đúng nội bộ: {self.answer}", fg="#7a4b00").pack(anchor="w", pady=(0, 8))
+        self.timer_label = tk.Label(master, text="", fg="red", font=("Segoe UI", 10, "bold"))
+        self.timer_label.pack(anchor="w", pady=(0, 8))
+        self.entry = tk.Entry(master, width=58)
+        self.entry.pack(fill="x")
+        self.update_countdown()
+        return self.entry
+
+    def update_countdown(self):
+        self.timer_label.config(text=f"Tự động chốt sau {self.remaining_seconds:02d} giây")
+        if self.remaining_seconds <= 0:
+            self.timer_job = None
+            self.ok()
+            return
+        self.remaining_seconds -= 1
+        self.timer_job = self.after(1000, self.update_countdown)
+
+    def cancel(self, event=None):
+        if self.timer_job:
+            try:
+                self.after_cancel(self.timer_job)
+            except tk.TclError:
+                pass
+            self.timer_job = None
+        super().cancel(event)
+
+    def apply(self):
+        self.result = self.entry.get().strip()
 
 if __name__ == "__main__":
     app = HostGUI()
