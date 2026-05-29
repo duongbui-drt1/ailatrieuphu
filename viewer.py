@@ -573,11 +573,13 @@ class ViewerGUI(tk.Tk):
             self.hide_overlay()
             return
         if scene == 'blank':
-            title, message = "", ""
-            self.scene_frame.config(bg="black")
-            self.scene_title.config(bg="black", fg="black")
-            self.scene_message.config(bg="black", fg="black")
-            self.scene_countdown.config(bg="black", fg="black")
+            title = title or "AI LÀ TRIỆU PHÚ"
+            message = ""
+            self.scene_title.config(font=("Segoe UI", 52, "bold"))
+            self.scene_frame.config(bg="#020817")
+            self.scene_title.config(bg="#020817", fg=PANEL_BORDER)
+            self.scene_message.config(bg="#020817", fg="#020817")
+            self.scene_countdown.config(bg="#020817", fg="#020817")
         else:
             self.scene_frame.config(bg="#020817")
             self.scene_title.config(bg="#020817", fg=PANEL_BORDER)

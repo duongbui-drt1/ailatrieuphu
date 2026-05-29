@@ -371,7 +371,7 @@ class HostGUI(tk.Tk):
         self.log("Viewer: technical standby.")
 
     def show_blank_scene(self):
-        server_logic.set_viewer_scene('blank', '', '', sound='viewer_blank')
+        server_logic.set_viewer_scene('blank', 'AI LÀ TRIỆU PHÚ', '', sound='viewer_blank')
         self.log("Viewer: blank screen.")
 
     def reset_viewers(self):
