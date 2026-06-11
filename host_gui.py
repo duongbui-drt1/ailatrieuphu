@@ -33,6 +33,8 @@ class HostGUI(tk.Tk):
         self.log_font = font.Font(family="Consolas", size=10)
         self.current_level = 0
         self.is_client_muted = False
+        self.give_up_regret_active = False
+        self.give_up_result_revealed = False
         self.logo_image = self.load_logo_image()
         self.poll_window = None
         self.configure_host_style()
@@ -181,8 +183,12 @@ class HostGUI(tk.Tk):
         self.confirm_answer_button = self.create_control_button(control_frame, "Công bố đáp án", self.confirm_locked_answer, bg=HOST_GREEN)
         self.confirm_answer_button.config(state=tk.DISABLED, disabledforeground="#7f8aa6")
         self.confirm_answer_button.pack(fill="x", pady=(16, 5))
-        self.cancel_answer_button = self.create_control_button(control_frame, "Hủy chốt đáp án", self.cancel_locked_answer, bg=HOST_RED)
+        self.cancel_answer_button = self.create_control_button(control_frame, "Unlock đáp án", self.cancel_locked_answer, bg="#9b5d15")
+        self.cancel_answer_button.config(state=tk.DISABLED, disabledforeground="#7f8aa6")
         self.cancel_answer_button.pack(fill="x", pady=5)
+        self.give_up_button = self.create_control_button(control_frame, "Give up", self.give_up_current_question, bg=HOST_RED)
+        self.give_up_button.config(state=tk.DISABLED, disabledforeground="#7f8aa6")
+        self.give_up_button.pack(fill="x", pady=5)
 
         self.add_group_label(control_frame, "SCENE VIEWER")
         self.create_button_row(control_frame, [
@@ -293,22 +299,38 @@ class HostGUI(tk.Tk):
         )
         self.host_question_status.grid(row=1, column=0, sticky="ew", pady=(4, 12))
 
-        question_card = tk.Frame(parent, bg="#061120", highlightthickness=1, highlightbackground=HOST_BORDER, padx=14, pady=14)
-        question_card.grid(row=2, column=0, sticky="nsew")
+        question_scroll_shell = tk.Frame(parent, bg=HOST_PANEL)
+        question_scroll_shell.grid(row=2, column=0, sticky="nsew")
+        question_scroll_shell.grid_rowconfigure(0, weight=1)
+        question_scroll_shell.grid_columnconfigure(0, weight=1)
+
+        self.host_question_canvas = tk.Canvas(
+            question_scroll_shell,
+            bg="#061120",
+            highlightthickness=1,
+            highlightbackground=HOST_BORDER,
+            bd=0,
+        )
+        question_scrollbar = tk.Scrollbar(question_scroll_shell, orient=tk.VERTICAL, command=self.host_question_canvas.yview)
+        self.host_question_canvas.configure(yscrollcommand=question_scrollbar.set)
+        self.host_question_canvas.grid(row=0, column=0, sticky="nsew")
+        question_scrollbar.grid(row=0, column=1, sticky="ns")
+
+        question_card = tk.Frame(self.host_question_canvas, bg="#061120", padx=14, pady=14)
+        self.host_question_window = self.host_question_canvas.create_window((0, 0), window=question_card, anchor="nw")
         question_card.grid_columnconfigure(0, weight=1)
-        question_card.grid_rowconfigure(1, weight=1)
 
         self.host_question_text = tk.Label(
             question_card,
             text="...",
             bg="#061120",
             fg=HOST_TEXT,
-            font=("Segoe UI", 17, "bold"),
+            font=("Segoe UI", 15, "bold"),
             anchor="nw",
             justify=tk.LEFT,
             wraplength=560,
         )
-        self.host_question_text.grid(row=0, column=0, sticky="ew", pady=(0, 14))
+        self.host_question_text.grid(row=0, column=0, sticky="ew", pady=(0, 12))
 
         options_frame = tk.Frame(question_card, bg="#061120")
         options_frame.grid(row=1, column=0, sticky="nsew")
@@ -325,9 +347,9 @@ class HostGUI(tk.Tk):
                 justify=tk.LEFT,
                 wraplength=520,
                 padx=12,
-                pady=9,
+                pady=7,
             )
-            option_label.grid(row=index, column=0, sticky="ew", pady=(0, 8))
+            option_label.grid(row=index, column=0, sticky="ew", pady=(0, 6))
             self.host_option_labels[key] = option_label
 
         self.host_answer_label = tk.Label(
@@ -340,10 +362,41 @@ class HostGUI(tk.Tk):
         )
         self.host_answer_label.grid(row=2, column=0, sticky="ew", pady=(8, 0))
 
-        question_card.bind(
+        self.bind_question_scroll(question_scroll_shell)
+        self.bind_question_scroll(self.host_question_canvas)
+        self.bind_question_scroll(question_card)
+        self.bind_question_scroll(options_frame)
+        for label in [self.host_question_text, self.host_answer_label, *self.host_option_labels.values()]:
+            self.bind_question_scroll(label)
+        question_card.bind("<Configure>", lambda event: self.update_question_scrollregion())
+        self.host_question_canvas.bind(
             "<Configure>",
-            lambda event: self.adjust_question_wrap(event.width),
+            lambda event: self.resize_question_scroll_window(event.width),
         )
+
+    def bind_question_scroll(self, widget):
+        widget.bind("<Enter>", self.enable_question_scroll)
+        widget.bind("<Leave>", self.disable_question_scroll)
+
+    def enable_question_scroll(self, event=None):
+        self.bind_all("<MouseWheel>", self.on_question_mousewheel)
+
+    def disable_question_scroll(self, event=None):
+        self.unbind_all("<MouseWheel>")
+
+    def on_question_mousewheel(self, event):
+        if hasattr(self, "host_question_canvas"):
+            self.host_question_canvas.yview_scroll(int(-event.delta / 120), "units")
+
+    def update_question_scrollregion(self):
+        if hasattr(self, "host_question_canvas"):
+            self.host_question_canvas.configure(scrollregion=self.host_question_canvas.bbox("all"))
+
+    def resize_question_scroll_window(self, width):
+        if hasattr(self, "host_question_canvas") and hasattr(self, "host_question_window"):
+            self.host_question_canvas.itemconfigure(self.host_question_window, width=max(320, width))
+            self.adjust_question_wrap(width)
+            self.update_question_scrollregion()
 
     def adjust_question_wrap(self, width):
         wrap = max(320, width - 36)
@@ -362,6 +415,8 @@ class HostGUI(tk.Tk):
             for key, label in self.host_option_labels.items():
                 label.config(text=f"{key}. ...", fg=HOST_MUTED, bg=HOST_PANEL_ALT)
             self.host_answer_label.config(text="Đáp án đúng: ...")
+            if hasattr(self, "host_question_canvas"):
+                self.host_question_canvas.yview_moveto(0)
             return
 
         level = data.get("level", "?")
@@ -381,6 +436,8 @@ class HostGUI(tk.Tk):
                 bg="#102647" if is_answer else HOST_PANEL_ALT,
             )
         self.host_answer_label.config(text=f"Đáp án đúng: {answer or '...'}")
+        if hasattr(self, "host_question_canvas"):
+            self.host_question_canvas.yview_moveto(0)
 
     def create_metric_card(self, parent, title, value, column, accent=HOST_TEXT):
         card = tk.Frame(parent, bg=HOST_PANEL, highlightthickness=1, highlightbackground=HOST_BORDER, padx=14, pady=12)
@@ -456,8 +513,8 @@ class HostGUI(tk.Tk):
         if not server_logic.player_conn:
             self.log("Lỗi: Không có người chơi để gửi lệnh.")
             return
-        server_logic.broadcast({'type': cmd_type, 'value': value})
-        self.log(f"Đã gửi lệnh '{cmd_type}: {value}' đến tất cả.")
+        server_logic.send_to_player({'type': cmd_type, 'value': value})
+        self.log(f"Đã gửi lệnh '{cmd_type}: {value}' đến client.")
 
     def toggle_client_mute(self):
         self.is_client_muted = not self.is_client_muted
@@ -479,10 +536,45 @@ class HostGUI(tk.Tk):
 
     def cancel_locked_answer(self):
         if server_logic.cancel_locked_answer_from_host():
-            self.confirm_answer_button.config(text="Công bố đáp án", state=tk.DISABLED)
-            self.lbl_last_answer.config(text="Đã hủy chốt, chờ thí sinh chọn lại", fg=HOST_ACCENT)
+            if self.give_up_regret_active:
+                self.cancel_answer_button.config(state=tk.DISABLED)
+                self.lbl_last_answer.config(text="Đã yêu cầu công bố đáp án tiếc nuối", fg=HOST_ACCENT)
+            else:
+                self.confirm_answer_button.config(text="Công bố đáp án", state=tk.DISABLED)
+                self.cancel_answer_button.config(state=tk.DISABLED)
+                self.give_up_button.config(state=tk.NORMAL)
+                self.lbl_last_answer.config(text="Đã hủy chốt, chờ thí sinh chọn lại", fg=HOST_ACCENT)
         else:
-            self.log("Không có đáp án nào để hủy chốt.")
+            self.log("Không có đáp án câu 6+ nào để unlock.")
+
+    def give_up_current_question(self):
+        if self.give_up_regret_active:
+            if not self.give_up_result_revealed:
+                self.log("Cần unlock/công bố đáp án tiếc nuối trước khi kết màn hình.")
+                return
+            if not messagebox.askyesno("Kết màn hình", "Kết thúc màn hình give up và chuyển sang tổng kết?"):
+                return
+            if server_logic.finish_give_up_from_host():
+                self.give_up_button.config(text="Give up", state=tk.DISABLED)
+                self.cancel_answer_button.config(state=tk.DISABLED)
+                self.lbl_last_answer.config(text="Đã gửi lệnh kết màn hình give up", fg=HOST_ACCENT)
+            else:
+                self.log("Chưa có lượt give up nào để kết màn hình.")
+            return
+
+        level = self.current_level or "?"
+        if not messagebox.askyesno("Give up", f"Cho thí sinh give up ở câu {level} và chọn đáp án tiếc nuối?"):
+            return
+        if server_logic.give_up_from_host():
+            self.give_up_regret_active = True
+            self.give_up_result_revealed = False
+            self.give_up_button.config(text="Kết màn hình", state=tk.DISABLED)
+            self.confirm_answer_button.config(text="Công bố đáp án", state=tk.DISABLED)
+            self.cancel_answer_button.config(state=tk.DISABLED)
+            self.lbl_last_answer.config(text=f"Thí sinh give up câu {level}. Chờ chọn đáp án tiếc nuối.", fg=HOST_ACCENT)
+            self.log(f"Host đã cho thí sinh give up câu {level}; đang chờ đáp án tiếc nuối.")
+        else:
+            self.log("Chưa có câu hỏi đang chạy để give up.")
 
     def resend_state(self):
         if server_logic.resend_current_state_from_host():
@@ -665,8 +757,12 @@ class HostGUI(tk.Tk):
             self.lbl_last_answer.config(text="Chưa có đáp án được chốt", fg=HOST_TEXT)
             self.update_question_tab(clear=True)
             self.current_level = 0
+            self.give_up_regret_active = False
+            self.give_up_result_revealed = False
             self.force_ready_button.config(state=tk.DISABLED)
             self.confirm_answer_button.config(state=tk.DISABLED)
+            self.cancel_answer_button.config(state=tk.DISABLED)
+            self.give_up_button.config(text="Give up", state=tk.DISABLED)
         elif msg_type == 'game_state':
             self.current_level = data['level']
             self.lbl_level.config(text=str(data['level']))
@@ -674,35 +770,75 @@ class HostGUI(tk.Tk):
             self.lbl_last_answer.config(text=f"Đang ở câu {data['level']}, chờ thí sinh chốt đáp án", fg=HOST_TEXT)
             self.update_question_tab(clear=True, status=f"Chuẩn bị câu {data['level']} - {data['prize']} VNĐ")
             self.confirm_answer_button.config(state=tk.DISABLED)
+            self.cancel_answer_button.config(state=tk.DISABLED)
+            if not self.give_up_regret_active:
+                self.give_up_button.config(text="Give up", state=tk.DISABLED)
         elif msg_type == 'question_live':
             self.lbl_last_answer.config(text=f"Đang chờ thí sinh trả lời câu {data['level']}", fg=HOST_TEXT)
             status = data.get('status') or f"Đang hỏi câu {data['level']} - {data.get('prize', '')} VNĐ"
             self.update_question_tab(data, status=status)
+            if not self.give_up_regret_active:
+                self.give_up_button.config(text="Give up", state=tk.NORMAL)
         elif msg_type == 'question_preview':
             status = data.get('status') or f"Chuẩn bị hỏi câu {data['level']} - {data.get('prize', '')} VNĐ"
             self.update_question_tab(data, status=status)
+            if not self.give_up_regret_active:
+                self.give_up_button.config(text="Give up", state=tk.DISABLED)
         elif msg_type == 'ready_waiting':
             self.force_ready_button.config(text=f"Bắt đầu câu {data['level']}", state=tk.NORMAL)
+            self.give_up_button.config(state=tk.DISABLED)
             self.lbl_last_answer.config(text=f"Đang chờ thí sinh sẵn sàng cho câu {data['level']}", fg=HOST_ACCENT)
         elif msg_type == 'ready_cleared':
             self.force_ready_button.config(text="Bắt đầu câu", state=tk.DISABLED)
         elif msg_type == 'answer_locked':
-            if data.get('requires_host_confirm'):
+            if data.get('give_up_regret'):
+                self.give_up_regret_active = True
+                self.give_up_result_revealed = False
+                self.confirm_answer_button.config(text="Công bố đáp án", state=tk.DISABLED)
+                self.cancel_answer_button.config(text="Unlock đáp án", state=tk.NORMAL)
+                self.give_up_button.config(text="Kết màn hình", state=tk.DISABLED)
+                text = f"Đáp án tiếc nuối: {data['player_answer']} - bấm Unlock để công bố"
+            elif data.get('requires_host_confirm'):
                 self.confirm_answer_button.config(text=f"Công bố đáp án {data['player_answer']}", state=tk.NORMAL)
+                self.cancel_answer_button.config(text="Unlock đáp án", state=tk.NORMAL)
+                self.give_up_button.config(state=tk.DISABLED)
                 text = f"Đã chốt đáp án {data['player_answer']} - chờ MC công bố"
             else:
                 self.confirm_answer_button.config(state=tk.DISABLED)
+                self.cancel_answer_button.config(state=tk.DISABLED)
                 text = f"Đã chốt đáp án {data['player_answer']} - tự động công bố"
             self.lbl_last_answer.config(text=text, fg=HOST_ACCENT)
             self.host_question_status.config(text=text, fg=HOST_ACCENT)
             self.log(text)
         elif msg_type == 'answer':
             self.confirm_answer_button.config(text="Công bố đáp án", state=tk.DISABLED)
+            self.cancel_answer_button.config(state=tk.DISABLED)
+            if data.get('give_up_regret'):
+                self.give_up_result_revealed = True
+                self.give_up_button.config(text="Kết màn hình", state=tk.NORMAL)
+            else:
+                self.give_up_button.config(state=tk.DISABLED)
             status, color = ("ĐÚNG", HOST_GREEN) if data['is_correct'] else ("SAI", HOST_RED)
-            text = f"'{data['player_answer']}' -> Đáp án đúng: '{data['correct_answer']}' ({status})"
+            prefix = "Tiếc nuối " if data.get('give_up_regret') else ""
+            text = f"{prefix}'{data['player_answer']}' -> Đáp án đúng: '{data['correct_answer']}' ({status})"
             self.lbl_last_answer.config(text=text, fg=color)
             self.host_question_status.config(text=f"Kết quả câu {self.lbl_level.cget('text')}: {status}", fg=color)
             self.log(f"Người chơi trả lời câu {self.lbl_level.cget('text')}: {text}")
+        elif msg_type == 'give_up_regret':
+            self.give_up_regret_active = True
+            self.give_up_result_revealed = False
+            self.lbl_last_answer.config(
+                text=f"Thí sinh đã give up câu {data['level']}, chờ đáp án tiếc nuối",
+                fg=HOST_ACCENT,
+            )
+            self.host_question_status.config(text="Đã give up. Chờ thí sinh chọn đáp án tiếc nuối.", fg=HOST_ACCENT)
+            self.confirm_answer_button.config(state=tk.DISABLED)
+            self.cancel_answer_button.config(text="Unlock đáp án", state=tk.DISABLED)
+            self.give_up_button.config(text="Kết màn hình", state=tk.DISABLED)
+        elif msg_type == 'give_up_revealed':
+            self.give_up_result_revealed = True
+            self.give_up_button.config(text="Kết màn hình", state=tk.NORMAL)
+            self.cancel_answer_button.config(state=tk.DISABLED)
         elif msg_type == 'wise_man_request':
             self.handle_wise_man_request(data['question'], data['answer'])
         elif msg_type == 'audience_request':

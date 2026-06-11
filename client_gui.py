@@ -55,6 +55,7 @@ class GameClientGUI(tk.Toplevel):
         self.pending_lifeline_job = None
         self.lifeline_audio_job = None
         self.answer_buttons_locked = False
+        self.last_background_music = None
 
         self.load_assets()
         self.create_widgets()
@@ -190,9 +191,10 @@ class GameClientGUI(tk.Toplevel):
                           font=("Segoe UI", 15, "bold"), fg="white", bd=0,
                           activebackground=WIDGET_BG, activeforeground="white",
                           highlightthickness=0, compound=tk.CENTER, state="disabled",
+                          wraplength=380, justify=tk.CENTER, padx=12, pady=2,
                           command=lambda o=option: self.send_answer(o))
             btn.configure(bg=WIDGET_BG)
-            btn.place(relx=relx, rely=rely, anchor=tk.CENTER)
+            btn.place(relx=relx, rely=rely, anchor=tk.CENTER, width=450, height=60)
             self.option_buttons[option] = btn
             self.option_positions[option] = {'relx': relx, 'rely': rely}
 
@@ -328,6 +330,28 @@ class GameClientGUI(tk.Toplevel):
         self.send_data({'ready': True})
         self.hide_overlay()
 
+    def option_font_for_text(self, text):
+        length = len(text)
+        if length >= 86:
+            size = 10
+        elif length >= 64:
+            size = 11
+        elif length >= 44:
+            size = 12
+        else:
+            size = 15
+        return ("Segoe UI", size, "bold")
+
+    def set_option_button_text(self, option, option_text):
+        display_text = f"{option}: {option_text}"
+        self.option_buttons[option].config(
+            text=display_text,
+            font=self.option_font_for_text(display_text),
+            wraplength=380,
+            justify=tk.CENTER,
+            anchor=tk.CENTER,
+        )
+
     def update_question_display(self, data):
         self.game_has_ended = False
         self.answer_buttons_locked = False
@@ -341,9 +365,9 @@ class GameClientGUI(tk.Toplevel):
             pos = self.option_positions[option]
             option_text = data['options'].get(option, '')
             if option_text:
-                btn.place(relx=pos['relx'], rely=pos['rely'], anchor=tk.CENTER)
-                btn.config(text=f"{option}: {option_text}",
-                          state="normal", image=self.btn_images['normal'])
+                btn.place(relx=pos['relx'], rely=pos['rely'], anchor=tk.CENTER, width=450, height=60)
+                self.set_option_button_text(option, option_text)
+                btn.config(state="normal", image=self.btn_images['normal'])
             else:
                 btn.place_forget()
 
@@ -377,11 +401,24 @@ class GameClientGUI(tk.Toplevel):
 
     def play_music_by_level(self):
         if 1 <= self.current_level <= 5:
-            self.audio_manager.play('wait_1_5', loop=True)
+            self.play_background_music('wait_1_5')
         elif 6 <= self.current_level <= 10:
-            self.audio_manager.play('wait_6_10', loop=True)
+            self.play_background_music('wait_6_10')
         elif 11 <= self.current_level <= 15:
-            self.audio_manager.play('wait_11_15', loop=True)
+            self.play_background_music('wait_11_15')
+
+    def play_background_music(self, name, loop=True):
+        self.last_background_music = (name, loop)
+        self.audio_manager.play(name, loop=loop)
+
+    def resume_background_music(self):
+        if self.game_has_ended:
+            return
+        if self.last_background_music:
+            name, loop = self.last_background_music
+            self.audio_manager.play(name, loop=loop)
+        else:
+            self.play_music_by_level()
 
     def set_visible_answer_buttons_state(self, state):
         self.answer_buttons_locked = state != "normal"
@@ -390,8 +427,9 @@ class GameClientGUI(tk.Toplevel):
                 btn.config(state="normal")
 
     def handle_lifeline_result(self, data):
-        lifeline_type = data['lifeline']
-        self.current_lifelines_state[lifeline_type] = False
+        lifeline_type = data.get('lifeline', 'unknown')
+        if lifeline_type in self.current_lifelines_state:
+            self.current_lifelines_state[lifeline_type] = False
 
         if lifeline_type == 'audience':
             opinions = data.get('opinions', [])
@@ -402,6 +440,8 @@ class GameClientGUI(tk.Toplevel):
                 message += "Không có dữ liệu hợp lệ từ khán giả."
             messagebox.showinfo("Trợ giúp", message)
         elif lifeline_type in ['call', 'wise_man']:
+            messagebox.showinfo("Trợ giúp", data.get('message', 'Không có dữ liệu trợ giúp.'))
+        elif data.get('message'):
             messagebox.showinfo("Trợ giúp", data['message'])
 
         self.finish_lifeline(lifeline_type)
@@ -460,6 +500,18 @@ class GameClientGUI(tk.Toplevel):
                     btn.config(image=self.btn_images['correct'])
                 else:
                     btn.config(image=self.btn_images['wrong'])
+
+        if data.get('give_up_regret'):
+            if is_correct:
+                self.audio_manager.play('correct')
+                result_text = "đúng"
+            else:
+                self.audio_manager.play('wrong')
+                result_text = "sai"
+            self.status_bar.config(
+                text=f"Đáp án tiếc nuối {result_text}. Đáp án đúng: {correct_answer}. Chờ host kết màn hình..."
+            )
+            return
 
         if is_correct:
             self.audio_manager.play('correct')
@@ -547,6 +599,8 @@ class GameClientGUI(tk.Toplevel):
         elif msg_type == 'answer_unlocked':
             if data.get('level') == self.current_level:
                 self.unlock_answer_selection()
+        elif msg_type == 'give_up_regret':
+            self.enter_give_up_regret_mode(data)
         elif msg_type == 'win':
             self.handle_win(data)
         elif msg_type == 'game_over':
@@ -555,6 +609,7 @@ class GameClientGUI(tk.Toplevel):
             if data['paused']:
                 message = "CHƯƠNG TRÌNH ĐÃ KẾT THÚC\nClient đang ở chế độ tạm dừng." if data.get('reason') == 'program_end' else "GAME TẠM DỪNG BỞI HOST"
                 self.show_overlay(message)
+                self.last_background_music = None
                 self.audio_manager.stop_all()
                 if data.get('reason') == 'program_end':
                     self.play_program_end_audio()
@@ -562,14 +617,18 @@ class GameClientGUI(tk.Toplevel):
                 self.hide_overlay()
                 self.play_music_by_level()
         elif msg_type == 'set_mute':
-            self.audio_manager.set_mute(data.get('value', False))
+            muted = data.get('value', False)
+            self.audio_manager.set_mute(muted)
+            if not muted:
+                self.resume_background_music()
         elif msg_type == 'set_beta':
             is_beta = data.get('value', False)
             title = f"Ai Là Triệu Phú (BETA) - {self.player_name}" if is_beta else f"Ai Là Triệu Phú - {self.player_name}"
             self.title(title)
         elif msg_type == 'play_music':
-            self.audio_manager.play(data.get('name', 'wait_11_15'), loop=data.get('loop', True))
+            self.play_background_music(data.get('name', 'wait_11_15'), loop=data.get('loop', True))
         elif msg_type == 'stop_music':
+            self.last_background_music = None
             self.audio_manager.stop_all()
         elif msg_type == 'play_effect':
             self.audio_manager.play(data.get('name', 'end_buzzer'))
@@ -648,6 +707,19 @@ class GameClientGUI(tk.Toplevel):
         self.status_bar.config(text=f"Đã chọn trợ giúp. Đang chạy hiệu ứng {delay_seconds} giây trước khi mở kết quả...")
         self.pending_lifeline_job = self.after(delay_ms, lambda: self.send_lifeline_request(lifeline_type))
 
+    def enter_give_up_regret_mode(self, data):
+        self.cancel_pending_lifeline(update_buttons=False)
+        self.last_background_music = None
+        self.audio_manager.stop_all()
+        self.answer_buttons_locked = False
+        for key in list(self.current_lifelines_state):
+            self.current_lifelines_state[key] = False
+        self.set_visible_answer_buttons_state("normal")
+        self.update_lifeline_buttons()
+        self.status_bar.config(
+            text=f"Đã dừng cuộc chơi ở câu {data.get('level')}. Hãy chọn đáp án tiếc nuối..."
+        )
+
     def send_data(self, data):
         try:
             if self.client_socket:
@@ -704,8 +776,9 @@ class GameClientGUI(tk.Toplevel):
     def handle_game_over(self, data=None):
         data = data or {}
         self.play_final_audio(False)
+        title = "THÍ SINH DỪNG CUỘC CHƠI" if data.get('reason') == 'give_up' else "PHẦN THI KẾT THÚC"
         self.show_final_overlay(
-            "PHẦN THI KẾT THÚC",
+            title,
             data.get('player_name', self.player_name),
             data.get('prize', '0'),
             False,

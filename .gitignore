@@ -343,6 +343,11 @@ paket-files/
 **/__pycache__/
 *.pyc
 
+# PyInstaller / desktop release output
+build/
+dist/
+dist - Copy/
+
 # Cake - Uncomment if you are using it
 #tools/**
 #!tools/packages.config

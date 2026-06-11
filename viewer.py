@@ -53,6 +53,8 @@ class ViewerGUI(tk.Tk):
         self.current_lifelines_state = {'5050': True, 'audience': True, 'call': True, 'wise_man': True}
         self.credit_animation_job = None
         self.audio_manager = AudioManager()
+        self.current_scene_sound = None
+        self.current_scene_sound_loop = False
 
         self.load_assets()
         self.create_widgets()
@@ -191,8 +193,8 @@ class ViewerGUI(tk.Tk):
                 bd=0,
                 highlightthickness=0,
                 anchor=tk.CENTER,
-                justify=tk.LEFT,
-                wraplength=390,
+                justify=tk.CENTER,
+                wraplength=360,
                 padx=18,
                 pady=10,
             )
@@ -326,6 +328,28 @@ class ViewerGUI(tk.Tk):
             height=82,
         )
 
+    def option_font_for_text(self, text):
+        length = len(text)
+        if length >= 92:
+            size = 11
+        elif length >= 70:
+            size = 12
+        elif length >= 50:
+            size = 13
+        else:
+            size = 17
+        return ("Segoe UI", size, "bold")
+
+    def set_option_label_text(self, option, option_text):
+        display_text = f"{option}: {option_text}"
+        self.option_buttons[option].config(
+            text=display_text,
+            font=self.option_font_for_text(display_text),
+            wraplength=360,
+            justify=tk.CENTER,
+            anchor=tk.CENTER,
+        )
+
     def style_answer_button(self, option, state):
         style = ANSWER_STYLES[state]
         self.option_buttons[option].config(
@@ -353,12 +377,22 @@ class ViewerGUI(tk.Tk):
             self.credit_animation_job = None
 
     def play_scene_audio(self, sound_name, loop=False):
+        self.current_scene_sound = sound_name
+        self.current_scene_sound_loop = loop
         self.audio_manager.stop_all()
         if sound_name and self.audio_manager.has_sound(sound_name):
             self.audio_manager.play(sound_name, loop=loop)
 
     def stop_scene_audio(self):
+        self.current_scene_sound = None
+        self.current_scene_sound_loop = False
         self.audio_manager.stop_all()
+
+    def resume_scene_audio(self):
+        if self.final_scene_active:
+            return
+        if self.current_scene_sound and self.audio_manager.has_sound(self.current_scene_sound):
+            self.audio_manager.play(self.current_scene_sound, loop=self.current_scene_sound_loop)
 
     def play_final_audio(self, is_win, with_buzzer=False):
         self.audio_manager.stop_all()
@@ -812,6 +846,8 @@ class ViewerGUI(tk.Tk):
             self.unlock_answer_display(data)
         elif msg_type == 'result':
             self.show_answer_result(data)
+        elif msg_type == 'give_up_regret':
+            self.show_give_up_regret(data)
         elif msg_type == 'viewer_scene':
             self.show_viewer_scene(data)
         elif msg_type == 'viewer_reset':
@@ -821,6 +857,11 @@ class ViewerGUI(tk.Tk):
                 self.show_overlay("GAME TẠM DỪNG BỞI HOST")
             else:
                 self.hide_overlay()
+        elif msg_type == 'set_mute':
+            muted = data.get('value', False)
+            self.audio_manager.set_mute(muted)
+            if not muted:
+                self.resume_scene_audio()
         elif msg_type == 'play_effect':
             self.audio_manager.play(data.get('name', 'end_buzzer'))
         elif msg_type == 'win':
@@ -843,7 +884,7 @@ class ViewerGUI(tk.Tk):
             option_text = data['options'].get(option, '')
             if option_text:
                 self.place_answer_button(option)
-                btn.config(text=f"{option}: {option_text}")
+                self.set_option_label_text(option, option_text)
                 self.style_answer_button(option, "normal")
             else:
                 btn.place_forget()
@@ -869,9 +910,9 @@ class ViewerGUI(tk.Tk):
     def handle_lifeline_result(self, data):
         """Xử lý kết quả từ sự trợ giúp (chỉ hiển thị 50:50)."""
         lifeline = data.get('lifeline')
-        if lifeline:
+        if lifeline in self.current_lifelines_state:
             self.current_lifelines_state[lifeline] = False
-        if data['lifeline'] == '5050' and 'options' in data:
+        if lifeline == '5050' and 'options' in data:
             for option, btn in self.option_buttons.items():
                 if not data['options'].get(option):
                     btn.place_forget()
@@ -899,6 +940,12 @@ class ViewerGUI(tk.Tk):
                 self.style_answer_button(key, "normal")
         self.status_bar.config(text="Host đã hủy chốt đáp án. Chờ thí sinh chọn lại.")
 
+    def show_give_up_regret(self, data):
+        self.current_lifelines_state = {key: False for key in self.current_lifelines_state}
+        self.status_bar.config(
+            text=f"Thí sinh đã give up câu {data.get('level')}. Đang chờ đáp án tiếc nuối..."
+        )
+
     def show_answer_result(self, data):
         """Hiển thị kết quả trả lời của người chơi."""
         player_answer = data.get('player_answer')
@@ -916,14 +963,20 @@ class ViewerGUI(tk.Tk):
                     self.style_answer_button(key, "wrong" if key == player_answer else "dim")
 
         status = "đúng" if data.get('correct') else "sai"
-        self.status_bar.config(text=f"Công bố: thí sinh trả lời {status}. Đáp án đúng: {correct_answer}.")
+        prefix = "Đáp án tiếc nuối" if data.get('give_up_regret') else "Công bố: thí sinh trả lời"
+        self.status_bar.config(text=f"{prefix} {status}. Đáp án đúng: {correct_answer}.")
 
     def show_final_scene(self, data, is_win):
         self.final_scene_active = True
         self.play_final_audio(is_win)
         player_name = data.get('player_name', 'Thí sinh')
         prize = data.get('prize', '0')
-        title = "CHÚC MỪNG TRIỆU PHÚ" if is_win else "PHẦN THI KẾT THÚC"
+        if is_win:
+            title = "CHÚC MỪNG TRIỆU PHÚ"
+        elif data.get('reason') == 'give_up':
+            title = "THÍ SINH DỪNG CUỘC CHƠI"
+        else:
+            title = "PHẦN THI KẾT THÚC"
         self.show_overlay(f"{title}\n\n{player_name}\nSố tiền nhận được: {prize} VNĐ")
         self.status_bar.config(text=f"Kết thúc lượt chơi. Số tiền nhận được: {prize} VNĐ")
 

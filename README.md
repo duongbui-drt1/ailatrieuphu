@@ -155,3 +155,23 @@ Hotkey:
 - `R`: resend trạng thái.
 - `B`: màn nghỉ 5 phút.
 - `Esc`: blank screen.
+
+## Build Desktop
+
+Script đóng gói nằm trong [`packaging/`](packaging/README.md).
+
+Windows:
+
+```powershell
+.\packaging\build_windows.bat
+```
+
+macOS:
+
+```bash
+bash packaging/build_macos.sh
+```
+
+Windows sẽ sinh `.exe` trong `dist/`. macOS sẽ sinh `.app` và `.pkg` trong `dist/`. Các build này tự gom `audio/`, `images/` và `questions_*.json`.
+
+Nếu không có máy Mac, dùng GitHub Actions workflow `Build desktop apps` để build macOS artifact trực tiếp trên GitHub.

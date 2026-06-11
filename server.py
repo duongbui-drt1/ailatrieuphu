@@ -3,6 +3,7 @@ import json
 import random
 import time
 import threading
+import traceback
 
 from resources import question_pack_paths
 
@@ -43,10 +44,14 @@ current_stats = {
 }
 host_ready_event = threading.Event()
 host_answer_confirm_event = threading.Event()
+host_give_up_event = threading.Event()
+host_regret_reveal_event = threading.Event()
+host_finish_give_up_event = threading.Event()
 host_control_lock = threading.Lock()
 waiting_for_ready_level = 0
 pending_answer = None
 pending_answer_level = 0
+pending_answer_is_regret = False
 
 CREDIT_LINES = [
     "CHƯƠNG TRÌNH ĐƯỢC ĐẦU TƯ VÀ SẢN XUẤT BỞI DULI PRODUCTION LLC.",
@@ -114,6 +119,14 @@ def send_to_one(conn, data):
     except (socket.error, BrokenPipeError):
         pass
 
+def send_to_player(data):
+    with connections_lock:
+        conn = player_conn
+    if not conn:
+        return False
+    send_to_one(conn, data)
+    return True
+
 def broadcast_to_viewers(data):
     with connections_lock:
         failed_conns = []
@@ -136,20 +149,37 @@ def force_ready_from_host():
 
 def confirm_locked_answer_from_host():
     with host_control_lock:
-        can_confirm = pending_answer is not None and pending_answer_level >= 6
+        can_confirm = pending_answer is not None and pending_answer_level >= 6 and not pending_answer_is_regret
     if can_confirm:
         host_answer_confirm_event.set()
     return can_confirm
 
 def cancel_locked_answer_from_host():
     with host_control_lock:
-        can_cancel = pending_answer is not None
+        can_cancel = pending_answer is not None and (pending_answer_is_regret or pending_answer_level >= READY_REQUIRED_FROM_LEVEL)
         level = pending_answer_level
+        is_regret = pending_answer_is_regret
     if can_cancel:
+        if is_regret:
+            host_regret_reveal_event.set()
+            update_host_gui({'type': 'log', 'message': f"Host yêu cầu công bố đáp án tiếc nuối ở câu {level}."})
+            return True
         clear_pending_answer()
         broadcast({'type': 'answer_unlocked', 'level': level})
         update_host_gui({'type': 'log', 'message': f"Host đã hủy đáp án đã chốt ở câu {level}."})
     return can_cancel
+
+def give_up_from_host():
+    can_give_up = player_conn is not None and current_question_index is not None
+    if can_give_up:
+        host_give_up_event.set()
+    return can_give_up
+
+def finish_give_up_from_host():
+    can_finish = player_conn is not None and current_question_index is not None
+    if can_finish:
+        host_finish_give_up_event.set()
+    return can_finish
 
 def resend_current_state_from_host():
     resent = False
@@ -159,12 +189,14 @@ def resend_current_state_from_host():
     with host_control_lock:
         answer = pending_answer
         level = pending_answer_level
+        is_regret = pending_answer_is_regret
     if answer:
         broadcast({
             'type': 'answer_locked',
             'player_answer': answer,
             'level': level,
             'requires_host_confirm': level >= 6,
+            'give_up_regret': is_regret,
         })
         resent = True
     if current_viewer_scene_packet:
@@ -205,12 +237,10 @@ def reset_viewers_from_host():
     return True
 
 def play_client_music_from_host(name):
-    broadcast({'type': 'play_music', 'name': name, 'loop': True})
-    return True
+    return send_to_player({'type': 'play_music', 'name': name, 'loop': True})
 
 def stop_client_music_from_host():
-    broadcast({'type': 'stop_music'})
-    return True
+    return send_to_player({'type': 'stop_music'})
 
 def play_effect_from_host(name):
     broadcast({'type': 'play_effect', 'name': name})
@@ -235,6 +265,7 @@ def broadcast_interactive_poll(sound=None):
         'Host đang lấy ý kiến khán giả',
         payload=payload,
         sound=sound,
+        sound_loop=bool(sound),
     )
     return payload
 
@@ -442,17 +473,19 @@ def clear_waiting_for_ready():
         waiting_for_ready_level = 0
     host_ready_event.clear()
 
-def set_pending_answer(answer, level):
-    global pending_answer, pending_answer_level
+def set_pending_answer(answer, level, is_regret=False):
+    global pending_answer, pending_answer_level, pending_answer_is_regret
     with host_control_lock:
         pending_answer = answer
         pending_answer_level = level
+        pending_answer_is_regret = is_regret
 
 def clear_pending_answer():
-    global pending_answer, pending_answer_level
+    global pending_answer, pending_answer_level, pending_answer_is_regret
     with host_control_lock:
         pending_answer = None
         pending_answer_level = 0
+        pending_answer_is_regret = False
     host_answer_confirm_event.clear()
 
 def needs_ready_confirmation(level):
@@ -462,6 +495,20 @@ def final_prize_on_wrong(level, current_prize):
     if level >= 10:
         return LOSS_PRIZE_FROM_LEVEL_10
     return current_prize or "0"
+
+def final_prize_on_give_up(level):
+    if 1 <= level <= len(PRIZE_LEVELS):
+        return PRIZE_LEVELS[level - 1]
+    return "0"
+
+def broadcast_lifeline_error(lifeline_type, message):
+    payload = {
+        'type': 'lifeline_result',
+        'lifeline': lifeline_type or 'unknown',
+        'message': message,
+        'opinions': [],
+    }
+    broadcast(payload)
 
 def load_random_question_pack():
     global QUESTIONS, active_question_pack_path
@@ -552,9 +599,78 @@ def handle_client(conn, addr, player_info):
             'lifelines_used': 0,
             'fastest_ping': None,
         })
+        host_give_up_event.clear()
+        host_regret_reveal_event.clear()
+        host_finish_give_up_event.clear()
 
         game_state = {'level': 0, 'lifelines': {'5050': True, 'audience': True, 'call': True, 'wise_man': True}, 'prize': "0", 'milestone_prize': "0"}
         client_buffer = ""
+        give_up_mode = False
+        give_up_result_revealed = False
+        give_up_final_prize = "0"
+
+        def enter_give_up_regret_mode(level):
+            nonlocal give_up_mode, give_up_result_revealed, give_up_final_prize
+            give_up_mode = True
+            give_up_result_revealed = False
+            give_up_final_prize = final_prize_on_give_up(level)
+            host_give_up_event.clear()
+            host_regret_reveal_event.clear()
+            host_finish_give_up_event.clear()
+            clear_pending_answer()
+            payload = {
+                'type': 'give_up_regret',
+                'level': level,
+                'prize': give_up_final_prize,
+                'player_name': player_name,
+            }
+            broadcast(payload)
+            update_host_gui(payload)
+            update_host_gui({'type': 'log', 'message': f"{player_name} give up ở câu {level}. Chờ chọn đáp án tiếc nuối."})
+
+        def reveal_give_up_regret_answer(level):
+            nonlocal give_up_result_revealed
+            with host_control_lock:
+                player_answer = pending_answer
+            if not player_answer:
+                host_regret_reveal_event.clear()
+                update_host_gui({'type': 'log', 'message': "Chưa có đáp án tiếc nuối để công bố."})
+                return
+            host_regret_reveal_event.clear()
+            correct_answer = q_data['answer']
+            is_correct = player_answer.upper() == correct_answer
+            clear_pending_answer()
+            result_payload = {
+                'type': 'result',
+                'correct': is_correct,
+                'correct_answer': correct_answer,
+                'player_answer': player_answer,
+                'ping': 0,
+                'give_up_regret': True,
+                'level': level,
+            }
+            update_host_gui({
+                'type': 'answer',
+                'player_answer': player_answer,
+                'correct_answer': correct_answer,
+                'is_correct': is_correct,
+                'give_up_regret': True,
+            })
+            broadcast(result_payload)
+            give_up_result_revealed = True
+            update_host_gui({'type': 'give_up_revealed', 'level': level, 'prize': give_up_final_prize})
+
+        def finish_give_up_after_regret(level):
+            host_finish_give_up_event.clear()
+            clear_pending_answer()
+            broadcast({
+                'type': 'game_over',
+                'prize': give_up_final_prize,
+                'player_name': player_name,
+                'level': level,
+                'reason': 'give_up',
+            })
+            update_host_gui({'type': 'log', 'message': f"Kết màn hình give up: {player_name} nhận {give_up_final_prize} VNĐ."})
 
         while game_state['level'] < len(QUESTIONS):
             while is_game_paused:
@@ -576,7 +692,11 @@ def handle_client(conn, addr, player_info):
             broadcast({'type': 'ask_ready', 'level': current_level + 1})
             set_waiting_for_ready(current_level + 1)
             update_host_gui({'type': 'ready_waiting', 'level': current_level + 1})
+            host_give_up_requested = False
             while True:
+                if host_give_up_event.is_set():
+                    host_give_up_requested = True
+                    break
                 if not needs_ready_confirmation(current_level + 1):
                     break
                 while is_game_paused:
@@ -594,6 +714,7 @@ def handle_client(conn, addr, player_info):
                 break
             clear_waiting_for_ready()
             update_host_gui({'type': 'ready_cleared'})
+            host_give_up_requested = False
 
             needs_question_broadcast = True
             locked_answer = None
@@ -614,6 +735,19 @@ def handle_client(conn, addr, player_info):
                     current_stats['questions_seen'] = max(current_stats['questions_seen'], current_level + 1)
                     needs_question_broadcast = False
 
+                if host_give_up_event.is_set() and not give_up_mode:
+                    enter_give_up_regret_mode(current_level + 1)
+                    continue
+
+                if give_up_mode:
+                    if host_regret_reveal_event.is_set():
+                        reveal_give_up_regret_answer(current_level + 1)
+                        continue
+                    if give_up_result_revealed and host_finish_give_up_event.is_set():
+                        finish_give_up_after_regret(current_level + 1)
+                        game_finished_normally = True
+                        break
+
                 if locked_answer and current_level + 1 >= 6 and host_answer_confirm_event.is_set():
                     response = {
                         'action': 'answer',
@@ -629,6 +763,39 @@ def handle_client(conn, addr, player_info):
                     continue
 
                 action = response.get('action')
+                if give_up_mode:
+                    if give_up_result_revealed:
+                        continue
+                    if action in ('answer', 'answer_locked'):
+                        regret_answer = response.get('value')
+                        if not regret_answer:
+                            continue
+                        with host_control_lock:
+                            same_pending_regret = pending_answer == regret_answer and pending_answer_is_regret
+                        if same_pending_regret:
+                            continue
+                        set_pending_answer(regret_answer, current_level + 1, is_regret=True)
+                        update_host_gui({
+                            'type': 'answer_locked',
+                            'player_answer': regret_answer,
+                            'level': current_level + 1,
+                            'requires_host_confirm': True,
+                            'give_up_regret': True,
+                        })
+                        broadcast({
+                            'type': 'answer_locked',
+                            'player_answer': regret_answer,
+                            'level': current_level + 1,
+                            'requires_host_confirm': True,
+                            'give_up_regret': True,
+                        })
+                    elif action == 'lifeline':
+                        broadcast_lifeline_error(
+                            response.get('value'),
+                            "Thí sinh đã give up, phần trợ giúp đã khóa. Hãy chọn đáp án tiếc nuối.",
+                        )
+                    continue
+
                 if action == 'answer':
                     if current_level + 1 >= 6 and not response.get('confirmed_by_host'):
                         locked_answer = response.get('value')
@@ -668,30 +835,61 @@ def handle_client(conn, addr, player_info):
                     })
                 elif action == 'lifeline':
                     lifeline_type = response.get('value')
-                    update_host_gui({'type': 'log', 'message': f"Người chơi dùng trợ giúp: {lifeline_type.upper()}"})
-                    current_stats['lifelines_used'] += 1
+                    try:
+                        if lifeline_type not in game_state['lifelines']:
+                            message = f"Trợ giúp không hợp lệ: {lifeline_type}"
+                            update_host_gui({'type': 'log', 'message': message})
+                            broadcast_lifeline_error(lifeline_type, message)
+                            continue
 
-                    if lifeline_type == '5050' and game_state['lifelines']['5050']:
-                        game_state['lifelines']['5050'] = False
-                        current_q_options = handle_lifeline_5050(q_data)
-                        needs_question_broadcast = True
-                    elif lifeline_type == 'audience' and game_state['lifelines']['audience']:
-                        game_state['lifelines']['audience'] = False
-                        update_host_gui({'type': 'audience_request'})
-                    elif lifeline_type == 'call' and game_state['lifelines']['call']:
-                        game_state['lifelines']['call'] = False
-                        update_host_gui({
-                            'type': 'call_request',
-                            'question': q_data['question'],
-                            'answer': q_data['answer'],
-                        })
-                    elif lifeline_type == 'wise_man' and game_state['lifelines']['wise_man'] and game_state['level'] >= 5:
-                        game_state['lifelines']['wise_man'] = False
-                        wrong_answers = [key for key in q_data['options'] if key != q_data['answer']]
-                        suggested_answer = q_data['answer'] if random.random() < 0.5 else random.choice(wrong_answers)
-                        advice = f"Tổ tư vấn nghiêng về đáp án {suggested_answer}"
-                        broadcast({'type': 'lifeline_result', 'lifeline': 'wise_man', 'message': advice})
-                        update_host_gui({'type': 'log', 'message': f"Tổ tư vấn đã gợi ý đáp án {suggested_answer}."})
+                        if not game_state['lifelines'].get(lifeline_type, False):
+                            message = f"Trợ giúp {lifeline_type.upper()} đã dùng hoặc không khả dụng."
+                            update_host_gui({'type': 'log', 'message': message})
+                            broadcast_lifeline_error(lifeline_type, message)
+                            continue
+
+                        if lifeline_type == 'wise_man' and game_state['level'] < 5:
+                            message = "Tư vấn chỉ mở từ câu 6."
+                            update_host_gui({'type': 'log', 'message': message})
+                            broadcast_lifeline_error(lifeline_type, message)
+                            continue
+
+                        update_host_gui({'type': 'log', 'message': f"Người chơi dùng trợ giúp: {lifeline_type.upper()}"})
+                        current_stats['lifelines_used'] += 1
+
+                        if lifeline_type == '5050':
+                            game_state['lifelines']['5050'] = False
+                            current_q_options = handle_lifeline_5050(q_data)
+                            needs_question_broadcast = True
+                        elif lifeline_type == 'audience':
+                            game_state['lifelines']['audience'] = False
+                            update_host_gui({'type': 'audience_request'})
+                        elif lifeline_type == 'call':
+                            game_state['lifelines']['call'] = False
+                            update_host_gui({
+                                'type': 'call_request',
+                                'question': q_data['question'],
+                                'answer': q_data['answer'],
+                            })
+                        elif lifeline_type == 'wise_man':
+                            game_state['lifelines']['wise_man'] = False
+                            wrong_answers = [key for key in q_data['options'] if key != q_data['answer']]
+                            suggested_answer = q_data['answer'] if random.random() < 0.5 else random.choice(wrong_answers)
+                            advice = f"Tổ tư vấn nghiêng về đáp án {suggested_answer}"
+                            broadcast({'type': 'lifeline_result', 'lifeline': 'wise_man', 'message': advice})
+                            update_host_gui({'type': 'log', 'message': f"Tổ tư vấn đã gợi ý đáp án {suggested_answer}."})
+                    except Exception as lifeline_error:
+                        message = f"LỖI trợ giúp {lifeline_type}: {lifeline_error}"
+                        update_host_gui({'type': 'log', 'message': message})
+                        update_host_gui({'type': 'log', 'message': traceback.format_exc()})
+                        broadcast_lifeline_error(
+                            lifeline_type,
+                            "Trợ giúp gặp lỗi kỹ thuật, host có thể xử lý thủ công. Kết nối vẫn được giữ.",
+                        )
+                        continue
+
+            if game_finished_normally:
+                break
 
             player_answer = response.get('value')
             clear_pending_answer()
@@ -734,9 +932,15 @@ def handle_client(conn, addr, player_info):
                 break
     except (ConnectionError, ConnectionResetError, BrokenPipeError, json.JSONDecodeError, AttributeError) as e:
         update_host_gui({'type': 'log', 'message': f"Người chơi '{player_name}' đã ngắt kết nối: {e}"})
+    except Exception as e:
+        update_host_gui({'type': 'log', 'message': f"LỖI SERVER trong luồng người chơi '{player_name}': {e}"})
+        update_host_gui({'type': 'log', 'message': traceback.format_exc()})
     finally:
         clear_waiting_for_ready()
         clear_pending_answer()
+        host_give_up_event.clear()
+        host_regret_reveal_event.clear()
+        host_finish_give_up_event.clear()
         if not game_finished_normally:
             broadcast({'type': 'game_ended_waiting'})
         update_host_gui({'type': 'disconnect'})

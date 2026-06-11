@@ -1,0 +1,167 @@
+[
+  {
+    "level": 1,
+    "question": "Đâu là tên một món ăn đặc sản truyền thống nổi tiếng của Hà Nội?",
+    "options": {
+      "A": "Phở cuốn",
+      "B": "Hủ tiếu Nam Vang",
+      "C": "Bún bò Huế",
+      "D": "Cơm tấm"
+    },
+    "answer": "A"
+  },
+  {
+    "level": 2,
+    "question": "Trong hệ Mặt Trời, hành tinh nào được mệnh danh là 'Hành tinh đỏ'?",
+    "options": {
+      "A": "Sao Kim",
+      "B": "Sao Hỏa",
+      "C": "Sao Mộc",
+      "D": "Sao Thổ"
+    },
+    "answer": "B"
+  },
+  {
+    "level": 3,
+    "question": "Con vật nào sau đây là biểu tượng đại diện cho ngành bưu điện?",
+    "options": {
+      "A": "Chim bồ câu",
+      "B": "Chim đại bàng",
+      "C": "Chim hải âu",
+      "D": "Chim én"
+    },
+    "answer": "A"
+  },
+  {
+    "level": 4,
+    "question": "Đâu là tên một tác phẩm văn học nổi tiếng của đại thi hào Nguyễn Du?",
+    "options": {
+      "A": "Lục Vân Tiên",
+      "B": "Chinh phụ ngâm",
+      "C": "Truyện Kiều",
+      "D": "Cung oán ngâm khúc"
+    },
+    "answer": "C"
+  },
+  {
+    "level": 5,
+    "question": "Nước đóng băng (thành đá) ở nhiệt độ bao nhiêu độ C trong điều kiện áp suất tiêu chuẩn?",
+    "options": {
+      "A": "100°C",
+      "B": "50°C",
+      "C": "10°C",
+      "D": "0°C"
+    },
+    "answer": "D"
+  },
+  {
+    "level": 6,
+    "question": "Eo biển nào là ranh giới tự nhiên phân chia giữa hai châu lục: Châu Á và Châu Mỹ?",
+    "options": {
+      "A": "Eo biển Gibraltar",
+      "B": "Eo biển Malacca",
+      "C": "Eo biển Bering",
+      "D": "Eo biển Magellan"
+    },
+    "answer": "C"
+  },
+  {
+    "level": 7,
+    "question": "Hoạ sĩ thiên tài Leonardo da Vinci đã phác họa bức chân dung nàng Mona Lisa trên loại chất liệu gì?",
+    "options": {
+      "A": "Vải toan (Canvas)",
+      "B": "Gỗ cây phong (Poplar wood)",
+      "C": "Giấy da (Parchment)",
+      "D": "Tường thạch cao (Fresco)"
+    },
+    "answer": "B"
+  },
+  {
+    "level": 8,
+    "question": "Trong bảng tuần hoàn các nguyên tố hóa học, kim loại nào có nhiệt độ nóng chảy cao nhất?",
+    "options": {
+      "A": "Vàng (Au)",
+      "B": "Sắt (Fe)",
+      "C": "Vonfram (W)",
+      "D": "Bạch kim (Pt)"
+    },
+    "answer": "C"
+  },
+  {
+    "level": 9,
+    "question": "Sự kiện lịch sử 'Tiếng trống Ninh Cơ' gắn liền với cuộc khởi nghĩa nào dưới đây?",
+    "options": {
+      "A": "Khởi nghĩa Hai Bà Trưng",
+      "B": "Khởi nghĩa Bà Triệu",
+      "C": "Khởi nghĩa Lý Bí",
+      "D": "Khởi nghĩa Mai Thúc Loan"
+    },
+    "answer": "A"
+  },
+  {
+    "level": 10,
+    "question": "Quốc gia nào dưới đây có nhiều múi giờ nhất trên thế giới (tính cả các lãnh thổ hải ngoại)?",
+    "options": {
+      "A": "Nga",
+      "B": "Mỹ",
+      "C": "Pháp",
+      "D": "Trung Quốc"
+    },
+    "answer": "C"
+  },
+  {
+    "level": 11,
+    "question": "Trong mật mã học, 'Mật mã Vigenère' – sử dụng một chuỗi các mật mã Caesar khác nhau – thuộc loại mật mã nào?",
+    "options": {
+      "A": "Mật mã thay thế đơn chữ (Monoalphabetic cipher)",
+      "B": "Mật mã thay thế đa chữ (Polyalphabetic cipher)",
+      "C": "Mật mã hoán vị (Transposition cipher)",
+      "D": "Mật mã dòng (Stream cipher)"
+    },
+    "answer": "B"
+  },
+  {
+    "level": 12,
+    "question": "Điền số tiếp theo vào dãy quy luật logic sau: 2, 3, 6, 15, 42, ...?",
+    "options": {
+      "A": "123",
+      "B": "121",
+      "C": "84",
+      "D": "105"
+    },
+    "answer": "A"
+  },
+  {
+    "level": 13,
+    "question": "Trong cơ học lượng tử, nghịch lý 'Con mèo của Schrödinger' được đưa ra nhằm phản bác cách diễn giải nào về hàm sóng?",
+    "options": {
+      "A": "Cách diễn giải Copenhagen (Copenhagen interpretation)",
+      "B": "Cách diễn giải Đa thế giới (Many-worlds interpretation)",
+      "C": "Thuyết biến ẩn (Hidden-variable theory)",
+      "D": "Cơ học Bohm (Bohmian mechanics)"
+    },
+    "answer": "A"
+  },
+  {
+    "level": 14,
+    "question": "Ai là nhà toán học cổ đại đã tính gần đúng chu vi Trái Đất bằng cách đo góc bóng râm của Mặt Trời tại Alexandria và Syene vào ngày hạ chí?",
+    "options": {
+      "A": "Aristarchus",
+      "B": "Eratosthenes",
+      "C": "Archimedes",
+      "D": "Hipparchus"
+    },
+    "answer": "B"
+  },
+  {
+    "level": 15,
+    "question": "Trận chiến 'Battle of Karansebes' (1788) là sự kiện hy hữu khi quân đội tự tấn công chính mình do hiểu lầm và say rượu. Đó là quân đội nước nào?",
+    "options": {
+      "A": "Đế quốc Ottoman",
+      "B": "Đế quốc Nga",
+      "C": "Đế quốc Áo (Habsburg)",
+      "D": "Đế quốc Phổ"
+    },
+    "answer": "C"
+  }
+]
