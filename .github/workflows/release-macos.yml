@@ -1,0 +1,64 @@
+name: Release macOS
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: App role to build
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - host
+          - client
+          - viewer
+  push:
+    tags:
+      - "macos_v*"
+
+jobs:
+  macos:
+    name: macOS pkg
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build macOS package
+        shell: bash
+        run: |
+          TARGET="${{ github.event.inputs.target }}"
+          if [ -z "$TARGET" ]; then TARGET="all"; fi
+          bash packaging/build_macos.sh "$TARGET"
+
+      - name: Keep pkg files only
+        shell: bash
+        run: |
+          find dist -maxdepth 1 -type d -name "*.app" -exec rm -rf {} +
+          ls -lh dist
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AiLaTrieuPhu-macOS-pkg
+          path: dist/*.pkg
+
+      - name: Create macOS GitHub release
+        if: startsWith(github.ref, 'refs/tags/macos_v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/*.pkg \
+            --title "Ai La Trieu Phu macOS ${GITHUB_REF_NAME}" \
+            --notes "macOS-only unsigned pkg build. Right-click and Open may be required on first launch."

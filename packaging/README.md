@@ -102,6 +102,15 @@ git tag -d v1.0.0
 git push origin :refs/tags/v1.0.0
 ```
 
+For a macOS-only release, push an OS-specific tag:
+
+```bash
+git tag macos_v1.0.0
+git push origin macos_v1.0.0
+```
+
+The macOS-only workflow uploads only `.pkg` files, not duplicated raw `.app` bundles, so the release is smaller and less confusing for end users.
+
 ## Direct Python build command
 
 If the helper scripts are not convenient:

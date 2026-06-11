@@ -182,3 +182,10 @@ Nếu không có máy Mac, dùng GitHub Actions workflow `Build desktop apps` đ
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+Để tạo riêng release macOS:
+
+```bash
+git tag macos_v1.0.0
+git push origin macos_v1.0.0
+```
