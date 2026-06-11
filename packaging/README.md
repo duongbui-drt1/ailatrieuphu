@@ -84,6 +84,24 @@ If you do not have a Mac, push the repo to GitHub and run the `Build desktop app
 
 The macOS artifact contains unsigned `.app` bundles and `.pkg` installers. For public distribution without Gatekeeper warnings, sign and notarize them with an Apple Developer ID.
 
+## Create a GitHub Release
+
+Push a version tag. The workflow will build Windows/macOS artifacts and create a GitHub Release automatically:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Use a new tag for each release, for example `v1.0.1`, `v1.1.0`, or `v2.0.0`.
+
+To delete and redo a bad local tag:
+
+```bash
+git tag -d v1.0.0
+git push origin :refs/tags/v1.0.0
+```
+
 ## Direct Python build command
 
 If the helper scripts are not convenient:

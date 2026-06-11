@@ -175,3 +175,10 @@ bash packaging/build_macos.sh
 Windows sẽ sinh `.exe` trong `dist/`. macOS sẽ sinh `.app` và `.pkg` trong `dist/`. Các build này tự gom `audio/`, `images/` và `questions_*.json`.
 
 Nếu không có máy Mac, dùng GitHub Actions workflow `Build desktop apps` để build macOS artifact trực tiếp trên GitHub.
+
+Để tạo GitHub Release tự động, push tag dạng `v1.0.0`:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
