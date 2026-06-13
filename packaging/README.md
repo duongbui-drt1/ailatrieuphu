@@ -111,6 +111,13 @@ git push origin macos_v1.0.0
 
 The macOS-only workflow uploads only `.pkg` files, not duplicated raw `.app` bundles, so the release is smaller and less confusing for end users.
 
+The macOS-only workflow targets macOS 14. It builds two packages:
+
+- `arm64-macos14`: for Apple Silicon Macs.
+- `intel-macos14`: for Intel Macs.
+
+GitHub's public `macos-14` runner is Apple Silicon, so the Intel package is built on GitHub's Intel macOS runner with `MACOSX_DEPLOYMENT_TARGET=14.0`.
+
 ## Direct Python build command
 
 If the helper scripts are not convenient:

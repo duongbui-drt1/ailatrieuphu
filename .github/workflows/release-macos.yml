@@ -21,9 +21,19 @@ on:
       - "macos_v*"
 
 jobs:
-  macos:
-    name: macOS pkg
-    runs-on: macos-latest
+  build:
+    name: macOS ${{ matrix.arch }} pkg
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+          - arch: intel
+            runner: macos-15-intel
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,27 +48,52 @@ jobs:
         run: |
           TARGET="${{ github.event.inputs.target }}"
           if [ -z "$TARGET" ]; then TARGET="all"; fi
+          sw_vers
+          uname -m
+          echo "MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET}"
           bash packaging/build_macos.sh "$TARGET"
 
-      - name: Keep pkg files only
+      - name: Keep and label pkg files only
         shell: bash
         run: |
+          mkdir -p release
           find dist -maxdepth 1 -type d -name "*.app" -exec rm -rf {} +
-          ls -lh dist
+          for pkg in dist/*.pkg; do
+            base="$(basename "$pkg" .pkg)"
+            cp "$pkg" "release/${base}-${{ matrix.arch }}-macos14.pkg"
+          done
+          ls -lh release
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AiLaTrieuPhu-macOS-pkg
-          path: dist/*.pkg
+          name: AiLaTrieuPhu-macOS-${{ matrix.arch }}-pkg
+          path: release/*.pkg
+
+  release:
+    name: macOS GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/macos_v')
+    steps:
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: List release files
+        shell: bash
+        run: |
+          find release-assets -maxdepth 3 -type f -print -exec ls -lh {} \;
 
       - name: Create macOS GitHub release
-        if: startsWith(github.ref, 'refs/tags/macos_v')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" dist/*.pkg \
+          mapfile -t pkgs < <(find release-assets -type f -name "*.pkg")
+          printf '%s\n' "${pkgs[@]}"
+          gh release create "${GITHUB_REF_NAME}" "${pkgs[@]}" \
             --title "Ai La Trieu Phu macOS ${GITHUB_REF_NAME}" \
-            --notes "macOS-only unsigned pkg build. Right-click and Open may be required on first launch."
+            --notes "macOS 14 unsigned pkg builds for Apple Silicon (arm64) and Intel. Right-click and Open may be required on first launch."

@@ -189,3 +189,5 @@ git push origin v1.0.0
 git tag macos_v1.0.0
 git push origin macos_v1.0.0
 ```
+
+Workflow macOS riêng target macOS 14 và sinh hai gói `.pkg`: `arm64-macos14` cho Apple Silicon, `intel-macos14` cho Mac Intel.
