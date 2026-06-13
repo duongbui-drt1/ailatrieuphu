@@ -113,6 +113,15 @@ git push origin macos_v1.0.0
 
 The macOS-only workflow uploads only `.pkg` files, not duplicated raw `.app` bundles, so the release is smaller and less confusing for end users.
 
+For a Windows-only release, push a Windows-specific tag:
+
+```bash
+git tag windows_v1.0.1
+git push origin windows_v1.0.1
+```
+
+The Windows-only workflow uploads a single Windows zip and keeps it separate from macOS packages.
+
 The macOS-only workflow targets macOS 14. It builds two packages:
 
 - `arm64-macos14`: for Apple Silicon Macs.
