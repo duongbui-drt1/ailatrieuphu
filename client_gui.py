@@ -7,11 +7,12 @@ import random
 import string
 import time
 try:
-    from ui_assets import apply_window_icon, load_background_source, load_button_images, load_logo_photo, load_lozenge_photo, render_background
+    from ui_assets import ColorButton, apply_window_icon, load_background_source, load_button_images, load_logo_photo, load_lozenge_photo, render_background
 except ImportError:
     messagebox.showerror("Thiếu thư viện", "Vui lòng cài đặt: pip install Pillow")
     exit()
 from audio_backend import AudioManager
+from app_info import APP_AUTHOR, APP_VERSION
 
 # --- CẤU HÌNH ---
 PORT = 65432
@@ -65,7 +66,7 @@ class GameClientGUI(tk.Toplevel):
     def load_assets(self):
         try:
             self.background_source = load_background_source()
-            self.btn_images = load_button_images((450, 60))
+            self.btn_images = load_button_images((470, 82))
             self.logo_image = load_logo_photo((72, 72))
             self.question_panel_image = load_lozenge_photo((880, 135), "normal", radius=18)
             self.prize_row_images = {
@@ -174,7 +175,7 @@ class GameClientGUI(tk.Toplevel):
         lifeline_texts = {"5050": "50:50", "audience": "Khán Giả", "call": "Gọi Điện", "wise_man": "Tư Vấn"}
 
         for key, text in lifeline_texts.items():
-            btn = tk.Button(self.lifeline_frame, text=text, font=("Arial", 12, "bold"),
+            btn = ColorButton(self.lifeline_frame, text=text, font=("Arial", 12, "bold"),
                           fg="white", bg="#10265f", activebackground="#173783",
                           activeforeground="white", disabledforeground="#61719d",
                           relief=tk.FLAT, bd=0, padx=16, pady=8, state="disabled",
@@ -184,18 +185,18 @@ class GameClientGUI(tk.Toplevel):
 
         self.option_buttons = {}
         self.option_positions = {}
-        positions = [(0.25, 0.58), (0.75, 0.58), (0.25, 0.79), (0.75, 0.79)]
+        positions = [(0.25, 0.57), (0.75, 0.57), (0.25, 0.80), (0.75, 0.80)]
 
         for i, option in enumerate(["A", "B", "C", "D"]):
             relx, rely = positions[i]
-            btn = tk.Button(self.game_area, image=self.btn_images['normal'],
+            btn = ColorButton(self.game_area, image=self.btn_images['normal'],
                           font=("Segoe UI", 15, "bold"), fg="white", bd=0,
                           activebackground=WIDGET_BG, activeforeground="white",
                           highlightthickness=0, compound=tk.CENTER, state="disabled",
-                          wraplength=380, justify=tk.CENTER, padx=12, pady=2,
+                          wraplength=410, justify=tk.CENTER, padx=12, pady=2,
+                          bg=WIDGET_BG, disabledforeground="#d7dbea",
                           command=lambda o=option: self.send_answer(o))
-            btn.configure(bg=WIDGET_BG)
-            btn.place(relx=relx, rely=rely, anchor=tk.CENTER, width=450, height=60)
+            btn.place(relx=relx, rely=rely, anchor=tk.CENTER, width=470, height=82)
             self.option_buttons[option] = btn
             self.option_positions[option] = {'relx': relx, 'rely': rely}
 
@@ -211,12 +212,12 @@ class GameClientGUI(tk.Toplevel):
                                     fg="white", bg=PANEL_BG, wraplength=680, justify=tk.CENTER)
         self.overlay_label.pack(pady=20)
 
-        self.ready_button = tk.Button(self.overlay_frame, text="Sẵn Sàng!",
+        self.ready_button = ColorButton(self.overlay_frame, text="Sẵn Sàng!",
                                     font=("Arial", 24, "bold"), command=self.send_ready,
                                     bg="#0f8f5f", activebackground="#12a873",
                                     fg="white", activeforeground="white",
                                     relief=tk.FLAT, padx=28, pady=10)
-        self.return_button = tk.Button(
+        self.return_button = ColorButton(
             self.overlay_frame,
             text="Kết thúc lượt chơi",
             font=("Segoe UI", 16, "bold"),
@@ -304,6 +305,12 @@ class GameClientGUI(tk.Toplevel):
         self.overlay_frame.place_forget()
         self.lifeline_frame.place(relx=0.5, rely=0.205, anchor=tk.CENTER)
         self.game_area.place(relx=0.5, rely=0.58, anchor=tk.CENTER, relwidth=1, relheight=0.74)
+        self.main_background_label.lower()
+        self.game_background_label.lower()
+        self.lbl_question.tkraise()
+        for button in self.option_buttons.values():
+            button.tkraise()
+        self.lifeline_frame.tkraise()
 
     def stop_final_animation(self):
         if self.final_animation_job:
@@ -348,7 +355,7 @@ class GameClientGUI(tk.Toplevel):
         self.option_buttons[option].config(
             text=display_text,
             font=self.option_font_for_text(display_text),
-            wraplength=380,
+            wraplength=410,
             justify=tk.CENTER,
             anchor=tk.CENTER,
         )
@@ -366,7 +373,7 @@ class GameClientGUI(tk.Toplevel):
             pos = self.option_positions[option]
             option_text = data['options'].get(option, '')
             if option_text:
-                btn.place(relx=pos['relx'], rely=pos['rely'], anchor=tk.CENTER, width=450, height=60)
+                btn.place(relx=pos['relx'], rely=pos['rely'], anchor=tk.CENTER, width=470, height=82)
                 self.set_option_button_text(option, option_text)
                 btn.config(state="normal", image=self.btn_images['normal'])
             else:
@@ -472,7 +479,7 @@ class GameClientGUI(tk.Toplevel):
         if self.current_level >= 6:
             self.status_bar.config(text=f"Đã chốt đáp án {answer}. Chờ MC công bố kết quả...")
         else:
-            self.after(1600, lambda: self.send_data({
+            self.after(900, lambda: self.send_data({
                 'action': 'answer',
                 'value': answer,
                 'timestamp': time.time()
@@ -812,7 +819,11 @@ class WelcomeScreen(tk.Tk):
         self.title("Ai Là Triệu Phú - Chào mừng")
         apply_window_icon(self)
         self.geometry("460x430")
+        self.minsize(460, 430)
         self.configure(bg=WIDGET_BG)
+        self.welcome_frame = tk.Frame(self, bg=WIDGET_BG)
+        self.welcome_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER, width=420)
+        self.bind("<Configure>", self.layout_welcome)
 
         self.audio_manager = AudioManager()
         self.audio_manager.play('welcome', loop=True)
@@ -821,15 +832,15 @@ class WelcomeScreen(tk.Tk):
             logo_image = load_logo_photo((120, 120))
             if not logo_image:
                 raise FileNotFoundError("images/logo.png")
-            tk.Label(self, image=logo_image, bg=WIDGET_BG).pack(pady=(22, 8))
+            tk.Label(self.welcome_frame, image=logo_image, bg=WIDGET_BG).pack(pady=(0, 8))
             self.logo_image = logo_image
         except Exception:
-            tk.Label(self, text="AI LÀ TRIỆU PHÚ", font=("Segoe UI", 24, "bold"), bg=WIDGET_BG, fg="white").pack(pady=(30, 12))
+            tk.Label(self.welcome_frame, text="AI LÀ TRIỆU PHÚ", font=("Segoe UI", 24, "bold"), bg=WIDGET_BG, fg="white").pack(pady=(0, 12))
 
-        tk.Label(self, text="AI LÀ TRIỆU PHÚ", font=("Segoe UI", 20, "bold"), bg=WIDGET_BG, fg="white").pack()
-        tk.Label(self, text="Kết nối thí sinh", font=("Segoe UI", 11), bg=WIDGET_BG, fg=TEXT_MUTED).pack(pady=(0, 18))
+        tk.Label(self.welcome_frame, text="AI LÀ TRIỆU PHÚ", font=("Segoe UI", 20, "bold"), bg=WIDGET_BG, fg="white").pack()
+        tk.Label(self.welcome_frame, text="Kết nối thí sinh", font=("Segoe UI", 11), bg=WIDGET_BG, fg=TEXT_MUTED).pack(pady=(0, 18))
 
-        form_frame = tk.Frame(self, bg=WIDGET_BG)
+        form_frame = tk.Frame(self.welcome_frame, bg=WIDGET_BG)
         form_frame.pack(fill="x", padx=56)
 
         tk.Label(form_frame, text="Tên thí sinh", bg=WIDGET_BG, fg=TEXT_MUTED, font=("Segoe UI", 10, "bold"), anchor="w").pack(fill="x")
@@ -840,8 +851,8 @@ class WelcomeScreen(tk.Tk):
         self.ip_entry = tk.Entry(form_frame, width=30, font=("Segoe UI", 12), bd=0, relief=tk.FLAT)
         self.ip_entry.pack(fill="x", ipady=8, pady=(4, 16))
 
-        tk.Button(
-            self,
+        ColorButton(
+            self.welcome_frame,
             text="Bắt Đầu Chơi",
             font=("Segoe UI", 14, "bold"),
             command=self.start_game,
@@ -854,8 +865,13 @@ class WelcomeScreen(tk.Tk):
             pady=9,
         ).pack(pady=2)
 
-        tk.Label(self, text="Duli Production DLV", bg=WIDGET_BG, fg=TEXT_MUTED,
-                font=("Segoe UI", 8, "italic")).pack(side="bottom", pady=12)
+        tk.Label(self.welcome_frame, text=f"{APP_AUTHOR} | v{APP_VERSION} | 2020 - 2026", bg=WIDGET_BG, fg=TEXT_MUTED,
+                font=("Segoe UI", 8, "italic")).pack(pady=(16, 0))
+
+    def layout_welcome(self, event=None):
+        if hasattr(self, "welcome_frame"):
+            width = min(max(380, self.winfo_width() - 80), 460)
+            self.welcome_frame.place_configure(width=width)
 
     def start_game(self):
         player_name = self.name_entry.get().strip()

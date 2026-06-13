@@ -347,6 +347,7 @@ paket-files/
 build/
 dist/
 dist - Copy/
+.tmp_pack_state/
 
 # Cake - Uncomment if you are using it
 #tools/**

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import plistlib
 import shutil
 import subprocess
 import sys
@@ -10,6 +11,19 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from app_info import (  # noqa: E402
+    APP_AUTHOR,
+    APP_COPYRIGHT,
+    APP_DESCRIPTION,
+    APP_IDENTIFIER_ROOT,
+    APP_PRODUCT_NAME,
+    APP_VERSION,
+    version_tuple,
+)
+
 DIST_DIR = Path(os.environ.get("AILTP_PYI_DIST_DIR", ROOT_DIR / "dist"))
 BUILD_DIR = Path(os.environ.get("AILTP_PYI_BUILD_DIR", ROOT_DIR / "build" / "pyinstaller"))
 SPEC_DIR = Path(os.environ.get("AILTP_PYI_SPEC_DIR", ROOT_DIR / "build" / "specs"))
@@ -152,7 +166,74 @@ def pyinstaller_icon_path() -> Path | None:
     return APP_ICON_SOURCE if APP_ICON_SOURCE.exists() else None
 
 
-def run_pyinstaller(app_key: str, onefile: bool) -> None:
+def windows_version_file(app_key: str, version: str) -> Path:
+    app = APPS[app_key]
+    output = icon_output_dir() / f"{app['name']}-version.txt"
+    file_version = version_tuple(version)
+    file_description = f"{APP_DESCRIPTION} - {app_key.title()}"
+    output.write_text(
+        f"""# UTF-8
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers={file_version},
+    prodvers={file_version},
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable(
+        '040904B0',
+        [
+          StringStruct('CompanyName', '{APP_AUTHOR}'),
+          StringStruct('FileDescription', '{file_description}'),
+          StringStruct('FileVersion', '{version}'),
+          StringStruct('InternalName', '{app['name']}'),
+          StringStruct('LegalCopyright', '{APP_COPYRIGHT}'),
+          StringStruct('OriginalFilename', '{app['name']}.exe'),
+          StringStruct('ProductName', '{APP_PRODUCT_NAME}'),
+          StringStruct('ProductVersion', '{version}')
+        ]
+      )
+    ]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
+""",
+        encoding="utf-8",
+    )
+    return output
+
+
+def apply_macos_bundle_metadata(app_key: str, version: str) -> None:
+    if sys.platform != "darwin":
+        return
+    app = APPS[app_key]
+    plist_path = DIST_DIR / f"{app['name']}.app" / "Contents" / "Info.plist"
+    if not plist_path.exists():
+        return
+
+    with plist_path.open("rb") as file:
+        plist = plistlib.load(file)
+    plist.update(
+        {
+            "CFBundleDisplayName": app["name"],
+            "CFBundleGetInfoString": f"{APP_PRODUCT_NAME} {version}, {APP_AUTHOR}",
+            "CFBundleIdentifier": f"{APP_IDENTIFIER_ROOT}.{app_key}",
+            "CFBundleShortVersionString": version,
+            "CFBundleVersion": version,
+            "NSHumanReadableCopyright": APP_COPYRIGHT,
+        }
+    )
+    with plist_path.open("wb") as file:
+        plistlib.dump(plist, file)
+
+
+def run_pyinstaller(app_key: str, onefile: bool, version: str) -> None:
     try:
         import PyInstaller.__main__ as pyinstaller
     except ImportError as exc:
@@ -189,6 +270,9 @@ def run_pyinstaller(app_key: str, onefile: bool) -> None:
     if icon_path:
         args.extend(["--icon", str(icon_path)])
 
+    if sys.platform == "win32":
+        args.extend(["--version-file", str(windows_version_file(app_key, version))])
+
     for source, destination in data_files():
         args.extend(["--add-data", f"{source}{os.pathsep}{destination}"])
 
@@ -206,6 +290,7 @@ def run_pyinstaller(app_key: str, onefile: bool) -> None:
 
     print(f"\n==> Building {app['name']}")
     pyinstaller.run(args)
+    apply_macos_bundle_metadata(app_key, version)
 
 
 def build_macos_pkg(app_keys: list[str], version: str) -> None:
@@ -235,7 +320,7 @@ def build_macos_pkg(app_keys: list[str], version: str) -> None:
             "--root",
             str(pkg_root),
             "--identifier",
-            f"vn.duli.ailatrieuphu.{identifier_suffix}",
+            f"{APP_IDENTIFIER_ROOT}.{identifier_suffix}",
             "--version",
             version,
             "--install-location",
@@ -252,7 +337,7 @@ def main() -> None:
     parser.add_argument("--target", choices=["all", *APPS.keys()], default="all")
     parser.add_argument("--onefile", action="store_true", help="Build one executable file per app.")
     parser.add_argument("--pkg", action="store_true", help="On macOS, also build a .pkg installer.")
-    parser.add_argument("--version", default="1.0.0")
+    parser.add_argument("--version", default=APP_VERSION)
     args = parser.parse_args()
 
     if args.pkg and args.onefile:
@@ -260,7 +345,7 @@ def main() -> None:
 
     app_keys = selected_apps(args.target)
     for app_key in app_keys:
-        run_pyinstaller(app_key, args.onefile)
+        run_pyinstaller(app_key, args.onefile, args.version)
 
     if args.pkg:
         build_macos_pkg(app_keys, args.version)

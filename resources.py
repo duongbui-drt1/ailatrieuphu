@@ -23,8 +23,6 @@ def audio_path(*names):
 
 
 def question_pack_paths():
-    packs = sorted(BASE_DIR.glob("questions_*.json"))
-    fallback = BASE_DIR / "questions.json"
-    if not packs and fallback.exists():
-        packs.append(fallback)
-    return packs
+    from question_packs import active_question_pack_paths
+
+    return active_question_pack_paths()

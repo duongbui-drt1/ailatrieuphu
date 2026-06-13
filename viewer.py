@@ -551,6 +551,7 @@ class ViewerGUI(tk.Tk):
         current_index = int(payload.get('current_index', 0) or 0)
         announced = set(payload.get('announced', []))
         answers = payload.get('answers', {})
+        results = payload.get('results', {})
         locked = set(payload.get('locked', []))
         if not questions:
             self.scene_message.config(text="Chưa tìm thấy câu hỏi tương tác trong pack dự phòng.")
@@ -564,16 +565,17 @@ class ViewerGUI(tk.Tk):
         active_font = ("Segoe UI", 13, "bold")
         for index, question in enumerate(questions):
             answer = answers.get(str(index))
+            result = results.get(str(index), {})
             was_announced = index in announced
             is_current = index == current_index
             is_locked = index in locked
-            bg = "#00CC44" if is_locked else (CURRENT_COLOR if is_current else ("#001B0A" if answer else ("#263a66" if was_announced else PANEL_BG)))
+            bg = ("#00CC44" if result.get("qualified") else "#8b1f36") if is_locked else (CURRENT_COLOR if is_current else ("#001B0A" if answer else ("#263a66" if was_announced else PANEL_BG)))
             fg = "#031507" if is_locked else ("#06122f" if is_current else ("#8ff0c5" if answer else TEXT_MUTED))
             text = f"Câu {index + 1}"
             if answer:
                 text += f"  {answer}"
             if is_locked:
-                text += "  CHỐT"
+                text += "  OK" if result.get("qualified") else "  SAI"
             tk.Label(
                 progress,
                 text=text,
@@ -586,6 +588,7 @@ class ViewerGUI(tk.Tk):
 
         current_question = questions[current_index]
         selected_answer = answers.get(str(current_index))
+        current_result = results.get(str(current_index), {})
         is_current_locked = current_index in locked
         question_font = ("Segoe UI", 24, "bold overstrike") if selected_answer else ("Segoe UI", 24, "bold")
         tk.Label(
@@ -630,16 +633,17 @@ class ViewerGUI(tk.Tk):
             ).grid(row=row, column=column, sticky="ew", padx=8, pady=8)
 
         if selected_answer:
-            final_text = (
-                f"ĐÁP ÁN POLL ĐÃ CHỐT: {selected_answer} - CHỌN BACK-UP PLAYER"
-                if is_current_locked else
-                f"Khán giả đang chọn đáp án {selected_answer}"
-            )
+            if is_current_locked and current_result.get("qualified"):
+                final_text = f"ĐÁP ÁN POLL ĐÃ CHỐT: {selected_answer} - CHỌN BACK-UP PLAYER"
+            elif is_current_locked:
+                final_text = f"ĐÁP ÁN POLL SAI: {selected_answer} - MẤT SLOT BACK-UP PLAYER"
+            else:
+                final_text = f"Khán giả đang chọn đáp án {selected_answer}"
             tk.Label(
                 self.poll_scene_frame,
                 text=final_text,
                 bg="#020817",
-                fg="#00CC44" if is_current_locked else CURRENT_COLOR,
+                fg=("#00CC44" if current_result.get("qualified") else "#ff9caf") if is_current_locked else CURRENT_COLOR,
                 font=("Segoe UI", 24, "bold"),
             ).pack(fill="x", pady=(20, 0))
 

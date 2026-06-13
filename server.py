@@ -5,12 +5,14 @@ import time
 import threading
 import traceback
 
-from resources import question_pack_paths
+from app_info import APP_AUTHOR, APP_COPYRIGHT, APP_VERSION
+import question_packs
 
 # --- CẤU HÌNH SERVER ---
 HOST = '0.0.0.0'
 PORT = 65432
 BUFFER_SIZE = 4096
+SERVER_POLL_INTERVAL = 0.08
 
 # --- DỮ LIỆU GAME ---
 QUESTIONS = []
@@ -34,6 +36,7 @@ current_game_state_packet = None
 current_viewer_scene_packet = None
 current_question_index = None
 active_question_pack_path = None
+active_question_pack_id = None
 current_poll_session = None
 current_stats = {
     'questions_seen': 0,
@@ -82,7 +85,9 @@ CREDIT_LINES = [
     "",
     "Fanpage: https://www.facebook.com/duliproduction",
     "",
-    "Copyright © 2026 Duli Production LLC & Sony Pictures. All rights reserved.",
+    f"{APP_AUTHOR} | Version {APP_VERSION}",
+    "",
+    APP_COPYRIGHT,
 ]
 
 def set_game_update_callback(callback):
@@ -248,12 +253,21 @@ def play_effect_from_host(name):
 
 def poll_payload_from_session():
     if not current_poll_session:
-        return {'questions': [], 'current_index': 0, 'announced': [], 'answers': {}}
+        return {'questions': [], 'current_index': 0, 'announced': [], 'answers': {}, 'results': {}}
+    public_questions = []
+    for question in current_poll_session.get('questions', []):
+        public_questions.append({
+            'level': question.get('level', 0),
+            'question': question.get('question', ''),
+            'options': question.get('options', {}).copy(),
+            'pack_id': question.get('pack_id', ''),
+        })
     return {
-        'questions': current_poll_session.get('questions', []),
+        'questions': public_questions,
         'current_index': current_poll_session.get('current_index', 0),
         'announced': sorted(current_poll_session.get('announced', set())),
         'answers': {str(index): answer for index, answer in current_poll_session.get('answers', {}).items()},
+        'results': {str(index): result for index, result in current_poll_session.get('results', {}).items()},
         'locked': sorted(current_poll_session.get('locked', set())),
     }
 
@@ -277,6 +291,7 @@ def start_interactive_poll_from_host(count=3):
         'current_index': 0,
         'announced': {0} if questions else set(),
         'answers': {},
+        'results': {},
         'locked': set(),
     }
     return broadcast_interactive_poll(sound='viewer_poll')
@@ -315,6 +330,13 @@ def lock_interactive_poll_answer_from_host(index=None):
         return False
     if target_index not in current_poll_session.get('answers', {}):
         return False
+    selected_answer = current_poll_session['answers'][target_index]
+    correct_answer = str(questions[target_index].get('answer', '')).strip().upper()
+    current_poll_session.setdefault('results', {})[target_index] = {
+        'selected_answer': selected_answer,
+        'correct_answer': correct_answer,
+        'qualified': selected_answer == correct_answer,
+    }
     current_poll_session.setdefault('locked', set()).add(target_index)
     current_poll_session.setdefault('announced', set()).add(target_index)
     broadcast_interactive_poll()
@@ -322,6 +344,47 @@ def lock_interactive_poll_answer_from_host(index=None):
 
 def get_interactive_poll_state():
     return poll_payload_from_session()
+
+def get_question_pack_records(include_deleted=False):
+    records = question_packs.question_pack_records(include_deleted=include_deleted)
+    for record in records:
+        record['active'] = record.get('id') == active_question_pack_id
+    return records
+
+def import_question_pack_from_host(path):
+    record = question_packs.import_question_pack(path)
+    update_host_gui({'type': 'pack_state_changed'})
+    update_host_gui({'type': 'log', 'message': f"Da import pack cau hoi: {record.get('name')}."})
+    return record
+
+def archive_question_pack_from_host(pack_id):
+    ok = question_packs.archive_pack(pack_id)
+    if ok:
+        update_host_gui({'type': 'pack_state_changed'})
+        update_host_gui({'type': 'log', 'message': f"Da luu tru pack: {pack_id}."})
+    return ok
+
+def delete_question_pack_from_host(pack_id):
+    ok = question_packs.delete_pack(pack_id)
+    if ok:
+        update_host_gui({'type': 'pack_state_changed'})
+        update_host_gui({'type': 'log', 'message': f"Da xoa pack: {pack_id}."})
+    return ok
+
+def restore_question_pack_from_host(pack_id):
+    ok = question_packs.restore_pack(pack_id)
+    if ok:
+        update_host_gui({'type': 'pack_state_changed'})
+        update_host_gui({'type': 'log', 'message': f"Da kich hoat lai pack: {pack_id}."})
+    return ok
+
+def preview_question_pack_from_host(pack_id):
+    for record in question_packs.question_pack_records(include_deleted=True):
+        if record.get('id') != pack_id:
+            continue
+        questions = question_packs.read_question_pack(record['path']) if record.get('exists') else []
+        return {**record, 'questions': questions}
+    return None
 
 def end_program_from_host():
     global is_game_paused
@@ -401,10 +464,9 @@ def swap_current_question_from_host():
     level = current_question_index + 1
     current_text = QUESTIONS[current_question_index].get('question', '')
     candidates = []
-    for pack_path in question_pack_paths():
+    for pack_path in question_packs.active_question_pack_paths():
         try:
-            with open(pack_path, 'r', encoding='utf-8') as file:
-                pack_questions = json.load(file)
+            pack_questions = question_packs.read_question_pack(pack_path)
         except Exception:
             continue
         for question in pack_questions:
@@ -424,23 +486,19 @@ def get_interactive_poll_questions(count=3):
     if current_question_index is not None and 0 <= current_question_index < len(QUESTIONS):
         current_text = QUESTIONS[current_question_index].get('question', '')
 
-    pack_paths = question_pack_paths()
-    inactive_packs = []
-    for pack_path in pack_paths:
-        if active_question_pack_path is None:
-            inactive_packs.append(pack_path)
+    pack_records = question_packs.active_pack_records()
+    inactive_records = []
+    for record in pack_records:
+        if active_question_pack_id is None:
+            inactive_records.append(record)
             continue
-        try:
-            if pack_path.resolve() != active_question_pack_path.resolve():
-                inactive_packs.append(pack_path)
-        except OSError:
-            inactive_packs.append(pack_path)
+        if record.get('id') != active_question_pack_id:
+            inactive_records.append(record)
 
     candidates = []
-    for pack_path in inactive_packs or pack_paths:
+    for record in inactive_records or pack_records:
         try:
-            with open(pack_path, 'r', encoding='utf-8') as file:
-                pack_questions = json.load(file)
+            pack_questions = question_packs.read_question_pack(record['path'])
         except Exception:
             continue
 
@@ -455,6 +513,8 @@ def get_interactive_poll_questions(count=3):
                 'level': question.get('level', 0),
                 'question': text,
                 'options': {key: str(options.get(key, '')).strip() for key in ['A', 'B', 'C', 'D']},
+                'answer': str(question.get('answer', '')).strip().upper(),
+                'pack_id': record.get('id', ''),
             })
 
     random.shuffle(candidates)
@@ -510,22 +570,34 @@ def broadcast_lifeline_error(lifeline_type, message):
     }
     broadcast(payload)
 
-def load_random_question_pack():
-    global QUESTIONS, active_question_pack_path
+def load_random_question_pack(avoid_current=False, mark_used=False):
+    global QUESTIONS, active_question_pack_path, active_question_pack_id
     try:
-        question_files = question_pack_paths()
-        if not question_files:
-            update_host_gui({'type': 'log', 'message': "LỖI: Không tìm thấy gói câu hỏi nào."})
+        previous_id = active_question_pack_id if avoid_current else None
+        chosen_pack = question_packs.choose_next_pack(previous_id)
+        if not chosen_pack:
+            update_host_gui({'type': 'log', 'message': "LOI: Khong tim thay pack cau hoi active nao."})
             return False
 
-        chosen_pack = random.choice(question_files)
-        with open(chosen_pack, 'r', encoding='utf-8') as f:
-            QUESTIONS = json.load(f)
-        active_question_pack_path = chosen_pack
-        update_host_gui({'type': 'log', 'message': f"Đã tải ngẫu nhiên gói câu hỏi: '{chosen_pack.name}'."})
+        QUESTIONS = question_packs.read_question_pack(chosen_pack['path'])
+        active_question_pack_path = chosen_pack['path']
+        active_question_pack_id = chosen_pack['id']
+        if mark_used:
+            updated_pack = question_packs.mark_pack_used(active_question_pack_id)
+            if updated_pack and updated_pack.get('status') in ('archived', 'deleted'):
+                update_host_gui({
+                    'type': 'log',
+                    'message': f"Pack '{updated_pack.get('name')}' da vuot {question_packs.MAX_ACTIVE_USES} luot hoi va chuyen sang {updated_pack.get('status')}.",
+                })
+        update_host_gui({
+            'type': 'pack_state_changed',
+            'active_pack_id': active_question_pack_id,
+            'active_pack_name': chosen_pack.get('name', chosen_pack.get('id', '')),
+        })
+        update_host_gui({'type': 'log', 'message': f"Da tai pack cau hoi: '{chosen_pack.get('name', chosen_pack.get('id'))}'."})
         return True
     except Exception as e:
-        update_host_gui({'type': 'log', 'message': f"LỖI: Không thể tải gói câu hỏi. Lý do: {e}"})
+        update_host_gui({'type': 'log', 'message': f"LOI: Khong the tai pack cau hoi. Ly do: {e}"})
         return False
 
 def handle_lifeline_5050(question):
@@ -592,6 +664,8 @@ def handle_client(conn, addr, player_info):
         player_name = player_info.get('name', 'Ẩn danh')
         player_id = player_info.get('id', 'N/A')
         update_host_gui({'type': 'connect', 'name': player_name, 'id': player_id, 'addr': addr})
+        if not load_random_question_pack(avoid_current=True, mark_used=True):
+            raise ConnectionError("Khong co pack cau hoi active de bat dau luot choi.")
         current_stats.update({
             'questions_seen': 0,
             'correct_answers': 0,
@@ -706,7 +780,7 @@ def handle_client(conn, addr, player_info):
                     update_host_gui({'type': 'log', 'message': f"Host đã xác nhận bắt đầu câu {current_level + 1}."})
                     break
 
-                ready_response, client_buffer = receive_json_message(conn, client_buffer, timeout=0.25)
+                ready_response, client_buffer = receive_json_message(conn, client_buffer, timeout=SERVER_POLL_INTERVAL)
                 if ready_response is None:
                     continue
                 if not ready_response.get('ready'):
@@ -758,7 +832,7 @@ def handle_client(conn, addr, player_info):
                     update_host_gui({'type': 'log', 'message': f"Host công bố đáp án {locked_answer} cho câu {current_level + 1}."})
                     break
 
-                response, client_buffer = receive_json_message(conn, client_buffer, timeout=0.25)
+                response, client_buffer = receive_json_message(conn, client_buffer, timeout=SERVER_POLL_INTERVAL)
                 if response is None:
                     continue
 

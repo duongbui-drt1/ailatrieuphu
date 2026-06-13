@@ -1,14 +1,16 @@
 import tkinter as tk
-from tkinter import scrolledtext, font, simpledialog, messagebox, ttk
+from tkinter import scrolledtext, font, simpledialog, messagebox, ttk, filedialog
 import threading
 import time
 import os
 import random
 import server as server_logic
+from app_info import APP_AUTHOR, APP_VERSION
 try:
-    from ui_assets import apply_window_icon, load_logo_photo
+    from ui_assets import ColorButton, apply_window_icon, load_logo_photo
 except ImportError:
     apply_window_icon = None
+    ColorButton = tk.Button
     load_logo_photo = None
 
 HOST_BG = "#07101f"
@@ -111,7 +113,7 @@ class HostGUI(tk.Tk):
         self.lbl_server_status.grid(row=0, column=title_column + 1, sticky="e")
         tk.Label(
             header,
-            text="Phòng điều khiển game show",
+            text=f"Phòng điều khiển game show | {APP_AUTHOR} | v{APP_VERSION}",
             font=("Segoe UI", 11),
             bg=HOST_BG,
             fg=HOST_MUTED,
@@ -257,11 +259,14 @@ class HostGUI(tk.Tk):
         host_tabs.grid(row=0, column=0, sticky="nsew")
 
         question_tab = tk.Frame(host_tabs, bg=HOST_PANEL, padx=14, pady=14)
+        tech_tab = tk.Frame(host_tabs, bg=HOST_PANEL, padx=14, pady=14)
         log_tab = tk.Frame(host_tabs, bg=HOST_PANEL, padx=12, pady=12)
         host_tabs.add(question_tab, text="Câu hỏi")
+        host_tabs.add(tech_tab, text="Kỹ thuật")
         host_tabs.add(log_tab, text="Nhật ký")
 
         self.build_question_tab(question_tab)
+        self.build_technical_tab(tech_tab)
 
         log_tab.grid_rowconfigure(1, weight=1)
         log_tab.grid_columnconfigure(0, weight=1)
@@ -377,6 +382,186 @@ class HostGUI(tk.Tk):
             lambda event: self.resize_question_scroll_window(event.width),
         )
 
+    def build_technical_tab(self, parent):
+        parent.grid_columnconfigure(0, weight=1)
+        parent.grid_rowconfigure(1, weight=1)
+        header = tk.Frame(parent, bg=HOST_PANEL)
+        header.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        tk.Label(
+            header,
+            text="QUẢN LÝ PACK CÂU HỎI",
+            bg=HOST_PANEL,
+            fg=HOST_ACCENT,
+            font=("Segoe UI", 12, "bold"),
+            anchor="w",
+        ).pack(side=tk.LEFT, fill="x", expand=True)
+        ColorButton(
+            header,
+            text="Refresh",
+            command=self.refresh_pack_list,
+            bg=HOST_PANEL_ALT,
+            fg=HOST_TEXT,
+            activebackground="#1b315d",
+            activeforeground=HOST_TEXT,
+            relief=tk.FLAT,
+            padx=12,
+            pady=7,
+        ).pack(side=tk.RIGHT)
+
+        body = tk.Frame(parent, bg=HOST_PANEL)
+        body.grid(row=1, column=0, sticky="nsew")
+        body.grid_columnconfigure(0, weight=1)
+        body.grid_columnconfigure(1, weight=0)
+        body.grid_rowconfigure(0, weight=1)
+
+        self.pack_listbox = tk.Listbox(
+            body,
+            bg="#061120",
+            fg=HOST_TEXT,
+            selectbackground="#16326b",
+            selectforeground=HOST_TEXT,
+            relief=tk.FLAT,
+            bd=0,
+            font=("Consolas", 10),
+            activestyle="none",
+        )
+        self.pack_listbox.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
+        self.pack_listbox.bind("<<ListboxSelect>>", lambda _event: self.update_pack_detail())
+
+        side = tk.Frame(body, bg=HOST_PANEL)
+        side.grid(row=0, column=1, sticky="ns")
+        self.pack_detail = tk.Label(
+            side,
+            text="Chưa chọn pack.",
+            bg="#061120",
+            fg=HOST_TEXT,
+            font=("Segoe UI", 10),
+            justify=tk.LEFT,
+            anchor="nw",
+            wraplength=320,
+            padx=12,
+            pady=12,
+        )
+        self.pack_detail.pack(fill="x", pady=(0, 10))
+        for text, command, bg in [
+            ("Xem pack", self.view_selected_pack, "#33456f"),
+            ("Import pack JSON", self.import_question_pack, HOST_GREEN),
+            ("Lưu trữ pack", self.archive_selected_pack, "#735f17"),
+            ("Kích hoạt lại", self.restore_selected_pack, "#263a66"),
+            ("Xóa pack", self.delete_selected_pack, HOST_RED),
+        ]:
+            ColorButton(
+                side,
+                text=text,
+                command=command,
+                bg=bg,
+                fg="white",
+                activebackground="#1b315d",
+                activeforeground="white",
+                relief=tk.FLAT,
+                padx=12,
+                pady=9,
+            ).pack(fill="x", pady=4)
+
+        self.pack_records = []
+        self.refresh_pack_list()
+
+    def refresh_pack_list(self):
+        if not hasattr(self, "pack_listbox"):
+            return
+        self.pack_records = server_logic.get_question_pack_records(include_deleted=True)
+        self.pack_listbox.delete(0, tk.END)
+        for record in self.pack_records:
+            active = "*" if record.get("active") else " "
+            status = record.get("status", "?").upper()
+            uses = record.get("use_count", 0)
+            source = record.get("source", "?")
+            exists = "OK" if record.get("exists") else "MISS"
+            name = record.get("name") or record.get("id")
+            self.pack_listbox.insert(tk.END, f"{active} [{status:<8}] used {uses}/2 | {source:<8} | {exists:<4} | {name}")
+        self.update_pack_detail()
+
+    def selected_pack_record(self):
+        if not hasattr(self, "pack_listbox"):
+            return None
+        selection = self.pack_listbox.curselection()
+        if not selection:
+            return None
+        index = selection[0]
+        if index >= len(self.pack_records):
+            return None
+        return self.pack_records[index]
+
+    def update_pack_detail(self):
+        record = self.selected_pack_record()
+        if not record:
+            if hasattr(self, "pack_detail"):
+                self.pack_detail.config(text="Chưa chọn pack.")
+            return
+        detail = (
+            f"Tên: {record.get('name')}\n"
+            f"ID: {record.get('id')}\n"
+            f"Trạng thái: {record.get('status')}\n"
+            f"Nguồn: {record.get('source')}\n"
+            f"Số lượt hỏi: {record.get('use_count', 0)}/{server_logic.question_packs.MAX_ACTIVE_USES}\n"
+            f"Đang dùng: {'Có' if record.get('active') else 'Không'}\n"
+            f"File: {record.get('path')}"
+        )
+        self.pack_detail.config(text=detail)
+
+    def import_question_pack(self):
+        path = filedialog.askopenfilename(
+            parent=self,
+            title="Import pack câu hỏi JSON",
+            filetypes=[("JSON question pack", "*.json"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            record = server_logic.import_question_pack_from_host(path)
+            self.log(f"Đã import pack: {record.get('name')}")
+            self.refresh_pack_list()
+        except Exception as exc:
+            messagebox.showerror("Import pack lỗi", str(exc), parent=self)
+
+    def archive_selected_pack(self):
+        record = self.selected_pack_record()
+        if not record:
+            return
+        if server_logic.archive_question_pack_from_host(record["id"]):
+            self.refresh_pack_list()
+
+    def restore_selected_pack(self):
+        record = self.selected_pack_record()
+        if not record:
+            return
+        if server_logic.restore_question_pack_from_host(record["id"]):
+            self.refresh_pack_list()
+
+    def delete_selected_pack(self):
+        record = self.selected_pack_record()
+        if not record:
+            return
+        if not messagebox.askyesno("Xóa pack", f"Xóa/ẩn pack '{record.get('name')}'?", parent=self):
+            return
+        if server_logic.delete_question_pack_from_host(record["id"]):
+            self.refresh_pack_list()
+
+    def view_selected_pack(self):
+        record = self.selected_pack_record()
+        if not record:
+            return
+        preview = server_logic.preview_question_pack_from_host(record["id"])
+        if not preview:
+            messagebox.showinfo("Pack", "Không đọc được pack này.", parent=self)
+            return
+        questions = preview.get("questions", [])
+        lines = [f"{preview.get('name')} - {len(questions)} câu", ""]
+        for question in questions[:15]:
+            lines.append(f"Câu {question.get('level')}: {question.get('question')}")
+            lines.append(f"  Đáp án đúng: {question.get('answer')}")
+        messagebox.showinfo("Xem pack câu hỏi", "\n".join(lines), parent=self)
+
     def bind_question_scroll(self, widget):
         widget.bind("<Enter>", self.enable_question_scroll)
         widget.bind("<Leave>", self.disable_question_scroll)
@@ -451,7 +636,7 @@ class HostGUI(tk.Tk):
         return value_label
 
     def create_control_button(self, parent, text, command, bg=HOST_PANEL_ALT):
-        return tk.Button(
+        return ColorButton(
             parent,
             text=text,
             command=command,
@@ -842,6 +1027,8 @@ class HostGUI(tk.Tk):
             self.give_up_result_revealed = True
             self.give_up_button.config(text="Kết màn hình", state=tk.NORMAL)
             self.cancel_answer_button.config(state=tk.DISABLED)
+        elif msg_type == 'pack_state_changed':
+            self.refresh_pack_list()
         elif msg_type == 'wise_man_request':
             self.handle_wise_man_request(data['question'], data['answer'])
         elif msg_type == 'audience_request':
@@ -955,7 +1142,7 @@ class PollControlWindow(tk.Toplevel):
         option_frame = tk.Frame(container, bg=HOST_BG)
         option_frame.pack(fill="x", pady=(12, 0))
         for answer in ["A", "B", "C", "D"]:
-            button = tk.Button(
+            button = ColorButton(
                 option_frame,
                 text=f"Khán giả chọn {answer}",
                 command=lambda value=answer: self.choose_answer(value),
@@ -971,7 +1158,7 @@ class PollControlWindow(tk.Toplevel):
             button.pack(side=tk.LEFT, fill="x", expand=True, padx=4)
             self.option_buttons.append(button)
 
-        self.lock_button = tk.Button(
+        self.lock_button = ColorButton(
             container,
             text="Chốt đáp án poll / chọn back-up player",
             command=self.lock_current_answer,
@@ -992,6 +1179,7 @@ class PollControlWindow(tk.Toplevel):
         current_index = state.get('current_index', 0)
         announced = set(state.get('announced', []))
         answers = state.get('answers', {})
+        results = state.get('results', {})
         locked = set(state.get('locked', []))
 
         for child in self.question_frame.winfo_children():
@@ -1008,13 +1196,17 @@ class PollControlWindow(tk.Toplevel):
 
         current_question = questions[current_index].get('question', '')
         current_answer = answers.get(str(current_index))
+        current_result = results.get(str(current_index), {})
         is_current_locked = current_index in locked
         status = f" | Khán giả chọn {current_answer}" if current_answer else ""
         if is_current_locked:
-            status += " | ĐÃ CHỐT"
+            status += " | HỢP LỆ" if current_result.get("qualified") else " | SAI - MẤT SLOT"
         self.current_label.config(text=f"Đang lên sóng câu {current_index + 1}: {current_question}{status}")
         if is_current_locked:
-            self.lock_status_label.config(text="Đáp án poll đã chốt. Có thể dùng kết quả này để chọn back-up player.")
+            if current_result.get("qualified"):
+                self.lock_status_label.config(text="Đáp án poll chính xác. Có thể dùng kết quả này để chọn back-up player.")
+            else:
+                self.lock_status_label.config(text=f"Đáp án poll sai. Đáp án đúng: {current_result.get('correct_answer', '?')}. Mất slot back-up player.")
         elif current_answer:
             self.lock_status_label.config(text="Nếu không đổi đáp án, hệ thống sẽ tự chốt sau 10 giây.")
         else:
@@ -1022,13 +1214,21 @@ class PollControlWindow(tk.Toplevel):
 
         for index, question in enumerate(questions):
             answer = answers.get(str(index))
+            result = results.get(str(index), {})
             was_announced = index in announced
             is_locked = index in locked
-            prefix = "CHỐT" if is_locked else ("✓" if answer else ("↗" if index == current_index else ("•" if was_announced else "○")))
+            if is_locked and result.get("qualified"):
+                prefix = "OK"
+            elif is_locked:
+                prefix = "SAI"
+            else:
+                prefix = "✓" if answer else ("↗" if index == current_index else ("•" if was_announced else "○"))
             text = f"{prefix} Câu {index + 1}: {question.get('question', '')}"
             if answer:
                 text += f"  [{answer}]"
-            button = tk.Button(
+            if is_locked and result:
+                text += f" / Đúng: {result.get('correct_answer', '?')}"
+            button = ColorButton(
                 self.question_frame,
                 text=text,
                 command=lambda value=index: self.select_question(value),
@@ -1112,7 +1312,12 @@ class PollControlWindow(tk.Toplevel):
         if server_logic.lock_interactive_poll_answer_from_host(index):
             self.cancel_auto_lock()
             label = "tự chốt" if auto else "MC chốt"
-            self.parent.log(f"Poll: {label} đáp án câu {index + 1}. Có thể chọn back-up player.")
+            state = server_logic.get_interactive_poll_state()
+            result = (state.get('results') or {}).get(str(index), {})
+            if result.get('qualified'):
+                self.parent.log(f"Poll: {label} đáp án câu {index + 1}. Hợp lệ để chọn back-up player.")
+            else:
+                self.parent.log(f"Poll: {label} đáp án câu {index + 1} nhưng sai đáp án pack. Mất slot back-up player.")
         self.refresh()
 
     def close(self):

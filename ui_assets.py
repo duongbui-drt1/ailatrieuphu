@@ -1,3 +1,5 @@
+import tkinter as tk
+
 from PIL import Image, ImageDraw, ImageOps, ImageTk
 
 from resources import image_path
@@ -80,6 +82,92 @@ def apply_window_icon(window, size=(64, 64)):
         window._app_icon_image = icon
     except Exception:
         pass
+
+
+class ColorButton(tk.Label):
+    def __init__(
+        self,
+        parent,
+        command=None,
+        bg="#10265f",
+        fg="#ffffff",
+        activebackground=None,
+        activeforeground=None,
+        disabledforeground="#8a94ad",
+        state=tk.NORMAL,
+        cursor="hand2",
+        **kwargs,
+    ):
+        self._command = command
+        self._normal_bg = bg
+        self._normal_fg = fg
+        self._active_bg = activebackground or bg
+        self._active_fg = activeforeground or fg
+        self._disabled_fg = disabledforeground
+        self._enabled = str(state) != str(tk.DISABLED)
+        self._cursor = cursor
+        kwargs.pop("state", None)
+        kwargs.setdefault("bg", bg)
+        kwargs.setdefault("fg", fg)
+        super().__init__(parent, **kwargs)
+        self.bind("<Button-1>", self._click)
+        self.bind("<Enter>", self._enter)
+        self.bind("<Leave>", self._leave)
+        self._apply_visual()
+
+    def configure(self, cnf=None, **kwargs):
+        if isinstance(cnf, str):
+            return super().configure(cnf)
+        if cnf:
+            kwargs.update(cnf)
+
+        command = kwargs.pop("command", None)
+        if command is not None:
+            self._command = command
+
+        state = kwargs.pop("state", None)
+        if "bg" in kwargs:
+            self._normal_bg = kwargs["bg"]
+        if "fg" in kwargs:
+            self._normal_fg = kwargs["fg"]
+        if "activebackground" in kwargs:
+            self._active_bg = kwargs.pop("activebackground")
+        if "activeforeground" in kwargs:
+            self._active_fg = kwargs.pop("activeforeground")
+        if "disabledforeground" in kwargs:
+            self._disabled_fg = kwargs.pop("disabledforeground")
+
+        super().configure(**kwargs)
+        if state is not None:
+            self.set_enabled(state)
+        else:
+            self._apply_visual()
+
+    config = configure
+
+    def cget(self, key):
+        if key == "state":
+            return tk.NORMAL if self._enabled else tk.DISABLED
+        return super().cget(key)
+
+    def set_enabled(self, state):
+        self._enabled = str(state) != str(tk.DISABLED)
+        self._apply_visual()
+
+    def _apply_visual(self, active=False):
+        bg = self._active_bg if active and self._enabled else self._normal_bg
+        fg = self._active_fg if active and self._enabled else (self._normal_fg if self._enabled else self._disabled_fg)
+        super().configure(bg=bg, fg=fg, cursor=self._cursor if self._enabled else "arrow")
+
+    def _enter(self, _event=None):
+        self._apply_visual(active=True)
+
+    def _leave(self, _event=None):
+        self._apply_visual(active=False)
+
+    def _click(self, _event=None):
+        if self._enabled and self._command:
+            self._command()
 
 
 def _load_button_image(state, size):
