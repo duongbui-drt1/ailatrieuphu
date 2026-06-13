@@ -6,8 +6,9 @@ import os
 import random
 import server as server_logic
 try:
-    from ui_assets import load_logo_photo
+    from ui_assets import apply_window_icon, load_logo_photo
 except ImportError:
+    apply_window_icon = None
     load_logo_photo = None
 
 HOST_BG = "#07101f"
@@ -24,6 +25,8 @@ class HostGUI(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Host Control - Ai Là Triệu Phú")
+        if apply_window_icon:
+            apply_window_icon(self)
         self.geometry("980x720")
         self.minsize(900, 640)
         self.configure(bg=HOST_BG)

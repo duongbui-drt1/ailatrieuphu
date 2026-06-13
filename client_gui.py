@@ -7,7 +7,7 @@ import random
 import string
 import time
 try:
-    from ui_assets import load_background_source, load_button_images, load_logo_photo, load_lozenge_photo, render_background
+    from ui_assets import apply_window_icon, load_background_source, load_button_images, load_logo_photo, load_lozenge_photo, render_background
 except ImportError:
     messagebox.showerror("Thiếu thư viện", "Vui lòng cài đặt: pip install Pillow")
     exit()
@@ -38,6 +38,7 @@ class GameClientGUI(tk.Toplevel):
     def __init__(self, master, player_name, player_id, server_ip, audio_manager):
         super().__init__(master)
         self.title(f"Ai Là Triệu Phú - {player_name}")
+        apply_window_icon(self)
         self.geometry("1280x720")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.withdraw()
@@ -809,6 +810,7 @@ class WelcomeScreen(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Ai Là Triệu Phú - Chào mừng")
+        apply_window_icon(self)
         self.geometry("460x430")
         self.configure(bg=WIDGET_BG)
 

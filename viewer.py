@@ -4,7 +4,7 @@ import threading
 import tkinter as tk
 from tkinter import simpledialog, messagebox
 try:
-    from ui_assets import load_background_source, load_button_images, load_logo_photo, load_lozenge_photo, render_background
+    from ui_assets import apply_window_icon, load_background_source, load_button_images, load_logo_photo, load_lozenge_photo, render_background
 except ImportError:
     messagebox.showerror("Thiếu thư viện", "Vui lòng cài đặt: pip install Pillow")
     exit()
@@ -42,6 +42,7 @@ class ViewerGUI(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Chế độ Khán giả - Ai Là Triệu Phú")
+        apply_window_icon(self)
         self.geometry("1280x720")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 

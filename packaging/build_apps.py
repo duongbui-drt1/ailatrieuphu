@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -12,6 +13,10 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 DIST_DIR = Path(os.environ.get("AILTP_PYI_DIST_DIR", ROOT_DIR / "dist"))
 BUILD_DIR = Path(os.environ.get("AILTP_PYI_BUILD_DIR", ROOT_DIR / "build" / "pyinstaller"))
 SPEC_DIR = Path(os.environ.get("AILTP_PYI_SPEC_DIR", ROOT_DIR / "build" / "specs"))
+ICON_BUILD_DIR = Path(
+    os.environ.get("AILTP_ICON_BUILD_DIR", Path(tempfile.gettempdir()) / "ailatrieuphu-icons")
+)
+APP_ICON_SOURCE = ROOT_DIR / "images" / "logo.png"
 
 APPS = {
     "host": {
@@ -71,6 +76,82 @@ def selected_apps(target: str) -> list[str]:
     return [target]
 
 
+def icon_output_dir() -> Path:
+    ICON_BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    return ICON_BUILD_DIR
+
+
+def load_pillow_image():
+    try:
+        from PIL import Image
+    except ImportError as exc:
+        raise SystemExit(
+            "Pillow is required to generate app icons. Run: python -m pip install -r requirements-build.txt"
+        ) from exc
+    return Image
+
+
+def windows_icon_path() -> Path | None:
+    explicit_icon = ROOT_DIR / "images" / "app.ico"
+    if explicit_icon.exists():
+        return explicit_icon
+    if not APP_ICON_SOURCE.exists():
+        return None
+
+    output = icon_output_dir() / "app.ico"
+    if output.exists() and output.stat().st_mtime >= APP_ICON_SOURCE.stat().st_mtime:
+        return output
+
+    Image = load_pillow_image()
+    image = Image.open(APP_ICON_SOURCE).convert("RGBA")
+    image.save(
+        output,
+        format="ICO",
+        sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)],
+    )
+    return output
+
+
+def macos_icon_path() -> Path | None:
+    explicit_icon = ROOT_DIR / "images" / "app.icns"
+    if explicit_icon.exists():
+        return explicit_icon
+    if not APP_ICON_SOURCE.exists():
+        return None
+    if sys.platform != "darwin":
+        return APP_ICON_SOURCE
+
+    output = icon_output_dir() / "app.icns"
+    if output.exists() and output.stat().st_mtime >= APP_ICON_SOURCE.stat().st_mtime:
+        return output
+
+    Image = load_pillow_image()
+    lanczos = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+    source = Image.open(APP_ICON_SOURCE).convert("RGBA")
+    iconset = icon_output_dir() / "app.iconset"
+    if iconset.exists():
+        shutil.rmtree(iconset)
+    iconset.mkdir(parents=True)
+
+    for base_size in (16, 32, 128, 256, 512):
+        for scale in (1, 2):
+            pixel_size = base_size * scale
+            suffix = "@2x" if scale == 2 else ""
+            icon_name = f"icon_{base_size}x{base_size}{suffix}.png"
+            source.resize((pixel_size, pixel_size), lanczos).save(iconset / icon_name)
+
+    subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(output)], check=True)
+    return output
+
+
+def pyinstaller_icon_path() -> Path | None:
+    if sys.platform == "win32":
+        return windows_icon_path()
+    if sys.platform == "darwin":
+        return macos_icon_path()
+    return APP_ICON_SOURCE if APP_ICON_SOURCE.exists() else None
+
+
 def run_pyinstaller(app_key: str, onefile: bool) -> None:
     try:
         import PyInstaller.__main__ as pyinstaller
@@ -103,6 +184,10 @@ def run_pyinstaller(app_key: str, onefile: bool) -> None:
         str(SPEC_DIR),
     ]
     args.append("--onefile" if onefile else "--onedir")
+
+    icon_path = pyinstaller_icon_path()
+    if icon_path:
+        args.extend(["--icon", str(icon_path)])
 
     for source, destination in data_files():
         args.extend(["--add-data", f"{source}{os.pathsep}{destination}"])

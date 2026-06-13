@@ -71,6 +71,17 @@ def load_logo_photo(size=(110, 110)):
     return ImageTk.PhotoImage(image)
 
 
+def apply_window_icon(window, size=(64, 64)):
+    try:
+        icon = load_logo_photo(size)
+        if not icon:
+            return
+        window.iconphoto(True, icon)
+        window._app_icon_image = icon
+    except Exception:
+        pass
+
+
 def _load_button_image(state, size):
     return _draw_lozenge(size, state, radius=size[1] // 2)
 

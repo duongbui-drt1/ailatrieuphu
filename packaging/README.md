@@ -8,6 +8,8 @@ The project ships three desktop apps:
 
 The build scripts package `audio/`, `images/`, and every `questions_*.json` file into each app.
 
+App icons are generated from `images/logo.png` during the build. To override them, add `images/app.ico` for Windows or `images/app.icns` for macOS.
+
 ## Windows .exe
 
 Run from the repo root:
