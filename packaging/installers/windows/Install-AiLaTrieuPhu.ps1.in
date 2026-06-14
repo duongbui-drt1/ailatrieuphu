@@ -55,7 +55,8 @@ if (-not $Roles.ContainsKey($Choice)) {
 
 $Role = $Roles[$Choice]
 $TempZip = Join-Path $env:TEMP "$($Role.Folder)-$Tag.zip"
-$TargetDir = Join-Path $InstallDir $Role.Display
+$TargetDir = Join-Path $InstallDir $Role.Folder
+$LegacyDisplayDir = Join-Path $InstallDir $Role.Display
 $ExtractRoot = Join-Path $env:TEMP "$($Role.Folder)-extract"
 $ExtractedDir = Join-Path $ExtractRoot $Role.Folder
 
@@ -94,7 +95,7 @@ if (-not $Downloaded) {
 }
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-foreach ($Path in @($TargetDir, $ExtractRoot)) {
+foreach ($Path in @($TargetDir, $LegacyDisplayDir, $ExtractRoot)) {
     if (Test-Path $Path) {
         Remove-Item -LiteralPath $Path -Recurse -Force
     }
@@ -121,13 +122,14 @@ $Desktop = [Environment]::GetFolderPath("Desktop")
 $ShortcutPath = Join-Path $Desktop "$($Role.Display).lnk"
 $Shell = New-Object -ComObject WScript.Shell
 $Shortcut = $Shell.CreateShortcut($ShortcutPath)
-$Shortcut.TargetPath = $Exe.FullName
-$Shortcut.WorkingDirectory = $Exe.DirectoryName
-$Shortcut.IconLocation = $Exe.FullName
+$Shortcut.TargetPath = [string]$Exe.FullName
+$Shortcut.WorkingDirectory = [string]$Exe.DirectoryName
+$Shortcut.IconLocation = "$($Exe.FullName),0"
 $Shortcut.Save()
 
 Write-Host ""
 Write-Host "Đã cài: $($Role.Display)" -ForegroundColor Green
+Write-Host "Thư mục cài đặt: $TargetDir"
 Write-Host "Shortcut: $ShortcutPath"
 Remove-Item -LiteralPath $ExtractRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host ""
