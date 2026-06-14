@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import re
 import shutil
 import tempfile
 import time
@@ -69,6 +70,21 @@ def pack_id_for_path(path: Path, source: str) -> str:
     return f"{source}:{path.name}"
 
 
+def default_pack_name(path: Path, source: str) -> str:
+    stem = path.stem
+    match = re.search(r"pack[_-]?(\d+)", stem, flags=re.IGNORECASE)
+    if source == "bundled":
+        if match:
+            return f"Pack chính thức {int(match.group(1)):02d}"
+        return "Pack câu hỏi mặc định"
+
+    clean_name = re.sub(r"^questions[_-]?", "", stem, flags=re.IGNORECASE)
+    clean_name = re.sub(r"[_-]\d{8}_\d{6}$", "", clean_name)
+    clean_name = clean_name.replace("_", " ").replace("-", " ").strip()
+    clean_name = re.sub(r"\s+", " ", clean_name) or "nhập ngoài"
+    return f"Pack nhập ngoài - {clean_name.title()}"
+
+
 def load_state() -> dict:
     path = state_path()
     if not path.exists():
@@ -128,11 +144,12 @@ def read_question_pack(path: Path) -> list[dict]:
 
 def ensure_record(state: dict, path: Path, source: str) -> dict:
     pack_id = pack_id_for_path(path, source)
+    default_name = default_pack_name(path, source)
     record = state["packs"].setdefault(
         pack_id,
         {
             "id": pack_id,
-            "name": path.stem,
+            "name": default_name,
             "path": str(path),
             "source": source,
             "status": "active",
@@ -142,7 +159,9 @@ def ensure_record(state: dict, path: Path, source: str) -> dict:
         },
     )
     record.update({"id": pack_id, "path": str(path), "source": source})
-    record.setdefault("name", path.stem)
+    existing_name = str(record.get("name") or "")
+    if source == "bundled" or existing_name in {"", path.stem}:
+        record["name"] = default_name
     record.setdefault("status", "active")
     record.setdefault("use_count", 0)
     record.setdefault("created_at", time.time())
@@ -226,7 +245,7 @@ def import_question_pack(source_path: str | Path) -> dict:
     record = ensure_record(state, destination, "imported")
     record.update(
         {
-            "name": source.stem,
+            "name": default_pack_name(destination, "imported"),
             "status": "active",
             "use_count": 0,
             "question_count": len(questions),

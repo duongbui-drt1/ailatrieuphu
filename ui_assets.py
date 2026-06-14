@@ -93,6 +93,7 @@ class ColorButton(tk.Label):
         fg="#ffffff",
         activebackground=None,
         activeforeground=None,
+        disabledbackground=None,
         disabledforeground="#8a94ad",
         state=tk.NORMAL,
         cursor="hand2",
@@ -103,16 +104,28 @@ class ColorButton(tk.Label):
         self._normal_fg = fg
         self._active_bg = activebackground or bg
         self._active_fg = activeforeground or fg
+        self._disabled_bg = disabledbackground or _blend_hex(bg, "#020817", 0.55)
         self._disabled_fg = disabledforeground
         self._enabled = str(state) != str(tk.DISABLED)
         self._cursor = cursor
+        self._pressed = False
         kwargs.pop("state", None)
         kwargs.setdefault("bg", bg)
         kwargs.setdefault("fg", fg)
+        kwargs.setdefault("anchor", tk.CENTER)
+        kwargs.setdefault("takefocus", 1)
+        kwargs.setdefault("highlightthickness", 1)
+        kwargs.setdefault("highlightbackground", _blend_hex(bg, "#ffffff", 0.18))
+        kwargs.setdefault("highlightcolor", activebackground or bg)
         super().__init__(parent, **kwargs)
-        self.bind("<Button-1>", self._click)
+        self.bind("<ButtonPress-1>", self._press)
+        self.bind("<ButtonRelease-1>", self._release)
         self.bind("<Enter>", self._enter)
         self.bind("<Leave>", self._leave)
+        self.bind("<FocusIn>", self._focus_in)
+        self.bind("<FocusOut>", self._focus_out)
+        self.bind("<Return>", self._keyboard_click)
+        self.bind("<space>", self._keyboard_click)
         self._apply_visual()
 
     def configure(self, cnf=None, **kwargs):
@@ -134,6 +147,8 @@ class ColorButton(tk.Label):
             self._active_bg = kwargs.pop("activebackground")
         if "activeforeground" in kwargs:
             self._active_fg = kwargs.pop("activeforeground")
+        if "disabledbackground" in kwargs:
+            self._disabled_bg = kwargs.pop("disabledbackground")
         if "disabledforeground" in kwargs:
             self._disabled_fg = kwargs.pop("disabledforeground")
 
@@ -152,22 +167,74 @@ class ColorButton(tk.Label):
 
     def set_enabled(self, state):
         self._enabled = str(state) != str(tk.DISABLED)
+        if not self._enabled:
+            self._pressed = False
         self._apply_visual()
 
-    def _apply_visual(self, active=False):
-        bg = self._active_bg if active and self._enabled else self._normal_bg
-        fg = self._active_fg if active and self._enabled else (self._normal_fg if self._enabled else self._disabled_fg)
-        super().configure(bg=bg, fg=fg, cursor=self._cursor if self._enabled else "arrow")
+    def _apply_visual(self, active=False, focused=False):
+        if not self._enabled:
+            bg = self._disabled_bg
+            fg = self._disabled_fg
+            relief = tk.FLAT
+            cursor = "arrow"
+        else:
+            bg = self._active_bg if active else self._normal_bg
+            fg = self._active_fg if active else self._normal_fg
+            relief = tk.SUNKEN if self._pressed else tk.FLAT
+            cursor = self._cursor
+        highlight = self._active_bg if (active or focused) and self._enabled else _blend_hex(bg, "#ffffff", 0.18)
+        super().configure(bg=bg, fg=fg, cursor=cursor, relief=relief, highlightbackground=highlight)
 
     def _enter(self, _event=None):
         self._apply_visual(active=True)
 
     def _leave(self, _event=None):
+        self._pressed = False
         self._apply_visual(active=False)
 
-    def _click(self, _event=None):
+    def _press(self, _event=None):
+        if self._enabled:
+            self.focus_set()
+            self._pressed = True
+            self._apply_visual(active=True)
+
+    def _release(self, event=None):
+        if not self._enabled:
+            return
+        was_pressed = self._pressed
+        self._pressed = False
+        self._apply_visual(active=False)
+        if not was_pressed or not self._command:
+            return
+        if event is not None:
+            widget = event.widget.winfo_containing(event.x_root, event.y_root)
+            if widget is not self:
+                return
+        self._command()
+
+    def _focus_in(self, _event=None):
+        self._apply_visual(focused=True)
+
+    def _focus_out(self, _event=None):
+        self._pressed = False
+        self._apply_visual()
+
+    def _keyboard_click(self, _event=None):
         if self._enabled and self._command:
             self._command()
+
+
+def _blend_hex(color, target, ratio):
+    def parse(value):
+        value = str(value).lstrip("#")
+        if len(value) != 6:
+            return (0, 0, 0)
+        return tuple(int(value[index:index + 2], 16) for index in (0, 2, 4))
+
+    base_rgb = parse(color)
+    target_rgb = parse(target)
+    mixed = tuple(round(base_rgb[i] * (1 - ratio) + target_rgb[i] * ratio) for i in range(3))
+    return "#{:02x}{:02x}{:02x}".format(*mixed)
 
 
 def _load_button_image(state, size):

@@ -57,6 +57,7 @@ class GameClientGUI(tk.Toplevel):
         self.pending_lifeline_job = None
         self.lifeline_audio_job = None
         self.answer_buttons_locked = False
+        self.blinking_job = None
         self.last_background_music = None
 
         self.load_assets()
@@ -299,6 +300,8 @@ class GameClientGUI(tk.Toplevel):
             self.return_button.pack_forget()
 
         self.overlay_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        self.overlay_frame.tkraise()
+        self.force_repaint()
 
     def hide_overlay(self):
         self.stop_final_animation()
@@ -311,6 +314,14 @@ class GameClientGUI(tk.Toplevel):
         for button in self.option_buttons.values():
             button.tkraise()
         self.lifeline_frame.tkraise()
+        self.force_repaint()
+
+    def force_repaint(self):
+        try:
+            self.update_idletasks()
+            self.after(25, self.update_idletasks)
+        except tk.TclError:
+            pass
 
     def stop_final_animation(self):
         if self.final_animation_job:
@@ -361,6 +372,7 @@ class GameClientGUI(tk.Toplevel):
         )
 
     def update_question_display(self, data):
+        self.stop_blinking_animation()
         self.game_has_ended = False
         self.answer_buttons_locked = False
         self.current_level = data['level']
@@ -382,6 +394,7 @@ class GameClientGUI(tk.Toplevel):
         self.update_lifeline_buttons()
         self.update_prize_display()
         self.play_music_by_level()
+        self.force_repaint()
         self.status_bar.config(text=f"Đang chờ thí sinh trả lời câu {self.current_level}...")
 
     def update_lifeline_buttons(self):
@@ -455,6 +468,7 @@ class GameClientGUI(tk.Toplevel):
         self.finish_lifeline(lifeline_type)
 
     def send_answer(self, answer):
+        self.stop_blinking_animation()
         if self.answer_buttons_locked:
             self.status_bar.config(text="Đang khóa đáp án trong lúc chạy hiệu ứng, vui lòng chờ...")
             return
@@ -491,11 +505,21 @@ class GameClientGUI(tk.Toplevel):
             new_image = (self.btn_images['normal'] if str(current_image) == str(self.btn_images['selected'])
                         else self.btn_images['selected'])
             button.config(image=new_image)
-            self.after(delay, lambda: self.blinking_animation(button, times - 1, delay))
+            self.blinking_job = self.after(delay, lambda: self.blinking_animation(button, times - 1, delay))
         elif self.client_socket:
             button.config(image=self.btn_images['selected'])
+            self.blinking_job = None
+
+    def stop_blinking_animation(self):
+        if self.blinking_job:
+            try:
+                self.after_cancel(self.blinking_job)
+            except tk.TclError:
+                pass
+            self.blinking_job = None
 
     def show_answer_result(self, data):
+        self.stop_blinking_animation()
         is_correct = data['correct']
         correct_answer = data['correct_answer']
 
@@ -508,6 +532,7 @@ class GameClientGUI(tk.Toplevel):
                     btn.config(image=self.btn_images['correct'])
                 else:
                     btn.config(image=self.btn_images['wrong'])
+        self.force_repaint()
 
         if data.get('give_up_regret'):
             if is_correct:
@@ -546,6 +571,7 @@ class GameClientGUI(tk.Toplevel):
         self.status_bar.config(text=f"Ping: {ping:.0f}ms ({status})")
 
     def unlock_answer_selection(self):
+        self.stop_blinking_animation()
         self.answer_buttons_locked = False
         for option, btn in self.option_buttons.items():
             if btn.winfo_ismapped():

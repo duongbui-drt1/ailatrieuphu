@@ -37,6 +37,7 @@ current_viewer_scene_packet = None
 current_question_index = None
 active_question_pack_path = None
 active_question_pack_id = None
+active_question_pack_reserved = False
 current_poll_session = None
 current_stats = {
     'questions_seen': 0,
@@ -570,8 +571,36 @@ def broadcast_lifeline_error(lifeline_type, message):
     }
     broadcast(payload)
 
-def load_random_question_pack(avoid_current=False, mark_used=False):
-    global QUESTIONS, active_question_pack_path, active_question_pack_id
+def notify_pack_usage_update(updated_pack):
+    if updated_pack and updated_pack.get('status') in ('archived', 'deleted'):
+        update_host_gui({
+            'type': 'log',
+            'message': f"Pack '{updated_pack.get('name')}' da vuot {question_packs.MAX_ACTIVE_USES} luot hoi va chuyen sang {updated_pack.get('status')}.",
+        })
+    update_host_gui({
+        'type': 'pack_state_changed',
+        'active_pack_id': active_question_pack_id,
+        'active_pack_name': updated_pack.get('name') if updated_pack else active_question_pack_id,
+    })
+
+
+def mark_active_question_pack_used():
+    global active_question_pack_reserved
+    if not active_question_pack_id:
+        return None
+    updated_pack = question_packs.mark_pack_used(active_question_pack_id)
+    active_question_pack_reserved = False
+    notify_pack_usage_update(updated_pack)
+    if updated_pack:
+        update_host_gui({
+            'type': 'log',
+            'message': f"Counter pack '{updated_pack.get('name', active_question_pack_id)}': {updated_pack.get('use_count', 0)}/{question_packs.MAX_ACTIVE_USES}.",
+        })
+    return updated_pack
+
+
+def load_random_question_pack(avoid_current=False, mark_used=False, reserve_for_next_player=False):
+    global QUESTIONS, active_question_pack_path, active_question_pack_id, active_question_pack_reserved
     try:
         previous_id = active_question_pack_id if avoid_current else None
         chosen_pack = question_packs.choose_next_pack(previous_id)
@@ -582,13 +611,9 @@ def load_random_question_pack(avoid_current=False, mark_used=False):
         QUESTIONS = question_packs.read_question_pack(chosen_pack['path'])
         active_question_pack_path = chosen_pack['path']
         active_question_pack_id = chosen_pack['id']
+        active_question_pack_reserved = reserve_for_next_player
         if mark_used:
-            updated_pack = question_packs.mark_pack_used(active_question_pack_id)
-            if updated_pack and updated_pack.get('status') in ('archived', 'deleted'):
-                update_host_gui({
-                    'type': 'log',
-                    'message': f"Pack '{updated_pack.get('name')}' da vuot {question_packs.MAX_ACTIVE_USES} luot hoi va chuyen sang {updated_pack.get('status')}.",
-                })
+            mark_active_question_pack_used()
         update_host_gui({
             'type': 'pack_state_changed',
             'active_pack_id': active_question_pack_id,
@@ -599,6 +624,28 @@ def load_random_question_pack(avoid_current=False, mark_used=False):
     except Exception as e:
         update_host_gui({'type': 'log', 'message': f"LOI: Khong the tai pack cau hoi. Ly do: {e}"})
         return False
+
+
+def load_question_pack_for_player():
+    active_records = question_packs.active_pack_records()
+    reserved_record = next((record for record in active_records if record.get('id') == active_question_pack_id), None)
+    if active_question_pack_reserved and reserved_record and QUESTIONS:
+        reserved_name = reserved_record.get('name', active_question_pack_id)
+        update_host_gui({'type': 'log', 'message': f"Su dung pack da chuan bi san: '{reserved_name}'."})
+        update_host_gui({
+            'type': 'pack_state_changed',
+            'active_pack_id': active_question_pack_id,
+            'active_pack_name': reserved_name,
+        })
+        return True
+    return load_random_question_pack(avoid_current=True, mark_used=False)
+
+
+def prepare_next_question_pack_after_game():
+    if load_random_question_pack(avoid_current=True, mark_used=False, reserve_for_next_player=True):
+        update_host_gui({'type': 'log', 'message': "Da shuffle va chuan bi pack cau hoi cho nguoi choi tiep theo."})
+        return True
+    return False
 
 def handle_lifeline_5050(question):
     correct_answer = question['answer']
@@ -664,7 +711,7 @@ def handle_client(conn, addr, player_info):
         player_name = player_info.get('name', 'Ẩn danh')
         player_id = player_info.get('id', 'N/A')
         update_host_gui({'type': 'connect', 'name': player_name, 'id': player_id, 'addr': addr})
-        if not load_random_question_pack(avoid_current=True, mark_used=True):
+        if not load_question_pack_for_player():
             raise ConnectionError("Khong co pack cau hoi active de bat dau luot choi.")
         current_stats.update({
             'questions_seen': 0,
@@ -682,6 +729,7 @@ def handle_client(conn, addr, player_info):
         give_up_mode = False
         give_up_result_revealed = False
         give_up_final_prize = "0"
+        session_pack_counted = False
 
         def enter_give_up_regret_mode(level):
             nonlocal give_up_mode, give_up_result_revealed, give_up_final_prize
@@ -806,6 +854,9 @@ def handle_client(conn, addr, player_info):
                     }
                     broadcast(current_game_state_packet)
                     notify_host_question_panel()
+                    if not session_pack_counted:
+                        mark_active_question_pack_used()
+                        session_pack_counted = True
                     current_stats['questions_seen'] = max(current_stats['questions_seen'], current_level + 1)
                     needs_question_broadcast = False
 
@@ -1017,6 +1068,8 @@ def handle_client(conn, addr, player_info):
         host_finish_give_up_event.clear()
         if not game_finished_normally:
             broadcast({'type': 'game_ended_waiting'})
+        else:
+            prepare_next_question_pack_after_game()
         update_host_gui({'type': 'disconnect'})
         if conn:
             conn.close()

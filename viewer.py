@@ -312,12 +312,22 @@ class ViewerGUI(tk.Tk):
         self.game_area.place_forget()
         self.overlay_label.config(text=message)
         self.overlay_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        self.overlay_frame.tkraise()
+        self.force_repaint()
 
     def hide_overlay(self):
         """Ẩn lớp phủ và hiển thị khu vực game."""
         self.hide_scene()
         self.overlay_frame.place_forget()
         self.game_area.place(relx=0.5, rely=0.58, anchor=tk.CENTER, relwidth=1, relheight=0.74)
+        self.force_repaint()
+
+    def force_repaint(self):
+        try:
+            self.update_idletasks()
+            self.after(25, self.update_idletasks)
+        except tk.TclError:
+            pass
 
     def place_answer_button(self, option):
         pos = self.option_positions[option]
@@ -895,6 +905,7 @@ class ViewerGUI(tk.Tk):
                 btn.place_forget()
 
         self.update_prize_display(self.current_level)
+        self.force_repaint()
         self.status_bar.config(text=f"Đang chờ thí sinh trả lời câu {self.current_level}...")
 
     def update_prize_display(self, current_level):

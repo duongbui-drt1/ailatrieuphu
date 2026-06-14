@@ -266,7 +266,7 @@ class HostGUI(tk.Tk):
         host_tabs.add(log_tab, text="Nhật ký")
 
         self.build_question_tab(question_tab)
-        self.build_technical_tab(tech_tab)
+        self.build_technical_tab_v2(tech_tab)
 
         log_tab.grid_rowconfigure(1, weight=1)
         log_tab.grid_columnconfigure(0, weight=1)
@@ -469,16 +469,20 @@ class HostGUI(tk.Tk):
     def refresh_pack_list(self):
         if not hasattr(self, "pack_listbox"):
             return
+        selected_record = self.selected_pack_record()
+        selected_id = selected_record.get("id") if selected_record else None
         self.pack_records = server_logic.get_question_pack_records(include_deleted=True)
         self.pack_listbox.delete(0, tk.END)
+        selection_index = None
         for record in self.pack_records:
-            active = "*" if record.get("active") else " "
-            status = record.get("status", "?").upper()
-            uses = record.get("use_count", 0)
-            source = record.get("source", "?")
-            exists = "OK" if record.get("exists") else "MISS"
-            name = record.get("name") or record.get("id")
-            self.pack_listbox.insert(tk.END, f"{active} [{status:<8}] used {uses}/2 | {source:<8} | {exists:<4} | {name}")
+            self.pack_listbox.insert(tk.END, self.format_pack_row(record))
+            if record.get("id") == selected_id:
+                selection_index = self.pack_listbox.size() - 1
+            elif selection_index is None and record.get("active"):
+                selection_index = self.pack_listbox.size() - 1
+        if selection_index is not None:
+            self.pack_listbox.selection_set(selection_index)
+            self.pack_listbox.activate(selection_index)
         self.update_pack_detail()
 
     def selected_pack_record(self):
@@ -561,6 +565,211 @@ class HostGUI(tk.Tk):
             lines.append(f"Câu {question.get('level')}: {question.get('question')}")
             lines.append(f"  Đáp án đúng: {question.get('answer')}")
         messagebox.showinfo("Xem pack câu hỏi", "\n".join(lines), parent=self)
+
+    def build_technical_tab_v2(self, parent):
+        parent.grid_columnconfigure(0, weight=1)
+        parent.grid_rowconfigure(2, weight=1)
+
+        header = tk.Frame(parent, bg=HOST_PANEL)
+        header.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        header.grid_columnconfigure(0, weight=1)
+        tk.Label(
+            header,
+            text="QUẢN LÝ PACK CÂU HỎI",
+            bg=HOST_PANEL,
+            fg=HOST_ACCENT,
+            font=("Segoe UI", 12, "bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew")
+        self.pack_summary_label = tk.Label(
+            header,
+            text="Đang tải danh sách pack...",
+            bg=HOST_PANEL,
+            fg=HOST_MUTED,
+            font=("Segoe UI", 9, "bold"),
+            anchor="e",
+        )
+        self.pack_summary_label.grid(row=0, column=1, sticky="e", padx=(12, 0))
+
+        toolbar = tk.Frame(parent, bg=HOST_PANEL)
+        toolbar.grid(row=1, column=0, sticky="ew", pady=(0, 10))
+        self.pack_action_buttons = {}
+        actions = [
+            ("import", "Import JSON", self.import_question_pack, HOST_GREEN),
+            ("view", "Xem pack", self.view_selected_pack, "#33456f"),
+            ("archive", "Lưu trữ", self.archive_selected_pack, "#735f17"),
+            ("restore", "Kích hoạt lại", self.restore_selected_pack, "#263a66"),
+            ("delete", "Xóa pack", self.delete_selected_pack, HOST_RED),
+            ("refresh", "Refresh", self.refresh_pack_list, HOST_PANEL_ALT),
+        ]
+        for index, (key, text, command, bg) in enumerate(actions):
+            toolbar.grid_columnconfigure(index, weight=1, uniform="pack_actions")
+            button = ColorButton(
+                toolbar,
+                text=text,
+                command=command,
+                bg=bg,
+                fg="white",
+                activebackground="#1b315d",
+                activeforeground="white",
+                disabledbackground="#111a2f",
+                disabledforeground="#6d7894",
+                relief=tk.FLAT,
+                padx=10,
+                pady=8,
+                font=("Segoe UI", 10, "bold"),
+            )
+            button.grid(row=0, column=index, sticky="ew", padx=(0 if index == 0 else 6, 0))
+            self.pack_action_buttons[key] = button
+
+        content = tk.Frame(parent, bg=HOST_PANEL)
+        content.grid(row=2, column=0, sticky="nsew")
+        content.grid_columnconfigure(0, weight=5)
+        content.grid_columnconfigure(1, weight=4)
+        content.grid_rowconfigure(0, weight=1)
+
+        list_frame = tk.Frame(content, bg="#061120", highlightthickness=1, highlightbackground=HOST_BORDER)
+        list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        list_frame.grid_rowconfigure(1, weight=1)
+        list_frame.grid_columnconfigure(0, weight=1)
+        tk.Label(
+            list_frame,
+            text="DANH SÁCH PACK",
+            bg="#061120",
+            fg=HOST_MUTED,
+            font=("Segoe UI", 9, "bold"),
+            anchor="w",
+            padx=10,
+            pady=8,
+        ).grid(row=0, column=0, sticky="ew")
+        self.pack_listbox = tk.Listbox(
+            list_frame,
+            bg="#061120",
+            fg=HOST_TEXT,
+            selectbackground="#16326b",
+            selectforeground=HOST_TEXT,
+            relief=tk.FLAT,
+            bd=0,
+            font=("Consolas", 10),
+            activestyle="none",
+            exportselection=False,
+        )
+        self.pack_listbox.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
+        self.pack_listbox.bind("<<ListboxSelect>>", lambda _event: self.update_pack_detail())
+
+        detail_frame = tk.Frame(content, bg="#061120", highlightthickness=1, highlightbackground=HOST_BORDER)
+        detail_frame.grid(row=0, column=1, sticky="nsew")
+        detail_frame.grid_rowconfigure(1, weight=1)
+        detail_frame.grid_columnconfigure(0, weight=1)
+        tk.Label(
+            detail_frame,
+            text="CHI TIẾT / PREVIEW",
+            bg="#061120",
+            fg=HOST_MUTED,
+            font=("Segoe UI", 9, "bold"),
+            anchor="w",
+            padx=10,
+            pady=8,
+        ).grid(row=0, column=0, sticky="ew")
+        self.pack_detail = tk.Label(
+            detail_frame,
+            text="Chưa chọn pack.",
+            bg="#061120",
+            fg=HOST_TEXT,
+            font=("Segoe UI", 10),
+            justify=tk.LEFT,
+            anchor="nw",
+            wraplength=420,
+            padx=12,
+            pady=10,
+        )
+        self.pack_detail.grid(row=1, column=0, sticky="nsew")
+
+        self.pack_records = []
+        self.refresh_pack_list()
+
+    def update_pack_detail(self):
+        record = self.selected_pack_record()
+        if not record:
+            if hasattr(self, "pack_detail"):
+                self.pack_detail.config(text="Chưa chọn pack.")
+            if hasattr(self, "pack_summary_label"):
+                self.pack_summary_label.config(text=f"{len(getattr(self, 'pack_records', []))} pack")
+            self.update_pack_action_state()
+            return
+
+        max_uses = server_logic.question_packs.MAX_ACTIVE_USES
+        active_count = sum(
+            1 for item in self.pack_records if item.get("status") == "active" and item.get("exists")
+        )
+        if hasattr(self, "pack_summary_label"):
+            self.pack_summary_label.config(text=f"{active_count} active / {len(self.pack_records)} tổng")
+
+        detail = (
+            f"Tên: {record.get('name')}\n"
+            f"ID: {record.get('id')}\n"
+            f"Trạng thái: {record.get('status')}\n"
+            f"Nguồn: {'Pack gốc' if record.get('source') == 'bundled' else 'Import ngoài'}\n"
+            f"Counter: {record.get('use_count', 0)}/{max_uses}\n"
+            f"Đang dùng: {'Có' if record.get('active') else 'Không'}\n"
+            f"Tồn tại file: {'Có' if record.get('exists') else 'Không'}\n"
+            f"File: {record.get('path')}"
+        )
+        self.pack_detail.config(text=detail)
+        self.update_pack_action_state()
+
+    def format_pack_row(self, record):
+        marker = "ON" if record.get("active") else "  "
+        status = str(record.get("status", "?")).upper()
+        uses = int(record.get("use_count", 0) or 0)
+        max_uses = server_logic.question_packs.MAX_ACTIVE_USES
+        source = "BUILTIN" if record.get("source") == "bundled" else "IMPORT"
+        exists = "OK" if record.get("exists") else "MISS"
+        name = record.get("name") or record.get("id")
+        return f"{marker:<2}  {status:<8}  {uses}/{max_uses}  {source:<7}  {exists:<4}  {name}"
+
+    def update_pack_action_state(self):
+        buttons = getattr(self, "pack_action_buttons", {})
+        if not buttons:
+            return
+        record = self.selected_pack_record()
+        for key in ("view", "archive", "restore", "delete"):
+            if key in buttons:
+                buttons[key].config(state=tk.DISABLED)
+        if not record:
+            return
+        status = record.get("status")
+        exists = bool(record.get("exists"))
+        if "view" in buttons and exists:
+            buttons["view"].config(state=tk.NORMAL)
+        if "archive" in buttons and status == "active" and exists:
+            buttons["archive"].config(state=tk.NORMAL)
+        if "restore" in buttons and status == "archived" and exists:
+            buttons["restore"].config(state=tk.NORMAL)
+        if "delete" in buttons and status != "deleted":
+            buttons["delete"].config(state=tk.NORMAL)
+
+    def view_selected_pack(self):
+        record = self.selected_pack_record()
+        if not record:
+            self.update_pack_action_state()
+            return
+        preview = server_logic.preview_question_pack_from_host(record["id"])
+        if not preview:
+            if hasattr(self, "pack_detail"):
+                self.pack_detail.config(text="Không đọc được pack này hoặc file pack không còn tồn tại.")
+            self.update_pack_action_state()
+            return
+        questions = preview.get("questions", [])
+        lines = [f"{preview.get('name')} - {len(questions)} câu", ""]
+        for question in questions[:8]:
+            lines.append(f"Câu {question.get('level')}: {question.get('question')}")
+            lines.append(f"  Đáp án đúng: {question.get('answer')}")
+        if len(questions) > 8:
+            lines.append("")
+            lines.append(f"... còn {len(questions) - 8} câu.")
+        self.pack_detail.config(text="\n".join(lines))
+        self.update_pack_action_state()
 
     def bind_question_scroll(self, widget):
         widget.bind("<Enter>", self.enable_question_scroll)
@@ -922,6 +1131,13 @@ class HostGUI(tk.Tk):
 
     def queue_gui_update(self, data):
         self.after(0, self.process_gui_update, data)
+        self.after(25, self.force_repaint)
+
+    def force_repaint(self):
+        try:
+            self.update_idletasks()
+        except tk.TclError:
+            pass
 
     def process_gui_update(self, data):
         msg_type = data.get('type')
