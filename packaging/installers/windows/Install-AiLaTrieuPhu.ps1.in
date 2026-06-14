@@ -11,19 +11,22 @@ $Roles = @{
         Key = "host"
         Display = "Ai Là Triệu Phú (Host)"
         Asset = "AiLaTrieuPhu-Windows-host-$Tag.zip"
-        Exe = "Ai Là Triệu Phú (Host).exe"
+        Folder = "AiLaTrieuPhu-Host"
+        Exe = "AiLaTrieuPhu-Host.exe"
     }
     "2" = @{
         Key = "client"
         Display = "Ai Là Triệu Phú (Người Chơi)"
         Asset = "AiLaTrieuPhu-Windows-client-$Tag.zip"
-        Exe = "Ai Là Triệu Phú (Người Chơi).exe"
+        Folder = "AiLaTrieuPhu-Client"
+        Exe = "AiLaTrieuPhu-Client.exe"
     }
     "3" = @{
         Key = "viewer"
         Display = "Ai Là Triệu Phú (Khán Giả)"
         Asset = "AiLaTrieuPhu-Windows-viewer-$Tag.zip"
-        Exe = "Ai Là Triệu Phú (Khán Giả).exe"
+        Folder = "AiLaTrieuPhu-Viewer"
+        Exe = "AiLaTrieuPhu-Viewer.exe"
     }
 }
 
@@ -45,6 +48,8 @@ $Role = $Roles[$Choice]
 $Url = "https://github.com/$Repo/releases/download/$Tag/$($Role.Asset)"
 $TempZip = Join-Path $env:TEMP $Role.Asset
 $TargetDir = Join-Path $InstallDir $Role.Display
+$ExtractRoot = Join-Path $env:TEMP "$($Role.Folder)-extract"
+$ExtractedDir = Join-Path $ExtractRoot $Role.Folder
 
 Write-Host ""
 Write-Host "Đang tải $($Role.Display)..." -ForegroundColor Cyan
@@ -52,14 +57,25 @@ Write-Host $Url
 Invoke-WebRequest -Uri $Url -OutFile $TempZip
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-if (Test-Path $TargetDir) {
-    Remove-Item -LiteralPath $TargetDir -Recurse -Force
+foreach ($Path in @($TargetDir, $ExtractRoot)) {
+    if (Test-Path $Path) {
+        Remove-Item -LiteralPath $Path -Recurse -Force
+    }
+}
+New-Item -ItemType Directory -Force -Path $ExtractRoot | Out-Null
+
+Write-Host "Đang giải nén..."
+Expand-Archive -Path $TempZip -DestinationPath $ExtractRoot -Force
+
+if (Test-Path $ExtractedDir) {
+    Move-Item -LiteralPath $ExtractedDir -Destination $TargetDir -Force
+} else {
+    New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
+    Get-ChildItem -LiteralPath $ExtractRoot -Force |
+        Move-Item -Destination $TargetDir -Force
 }
 
-Write-Host "Đang giải nén vào $InstallDir..."
-Expand-Archive -Path $TempZip -DestinationPath $InstallDir -Force
-
-$Exe = Get-ChildItem -LiteralPath $InstallDir -Recurse -Filter $Role.Exe | Select-Object -First 1
+$Exe = Get-ChildItem -LiteralPath $TargetDir -Recurse -Filter $Role.Exe | Select-Object -First 1
 if (-not $Exe) {
     throw "Không tìm thấy file chạy: $($Role.Exe)"
 }
@@ -76,6 +92,7 @@ $Shortcut.Save()
 Write-Host ""
 Write-Host "Đã cài: $($Role.Display)" -ForegroundColor Green
 Write-Host "Shortcut: $ShortcutPath"
+Remove-Item -LiteralPath $ExtractRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host ""
 $OpenNow = Read-Host "Mở app ngay bây giờ? (Y/N)"
 if ($OpenNow -match "^[Yy]") {

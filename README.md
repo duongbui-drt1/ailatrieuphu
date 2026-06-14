@@ -1,16 +1,203 @@
-# AI LÀ TRIỆU PHÚ CODE
+# Ai Là Triệu Phú Desktop Suite
 
-Ứng dụng chơi "Ai Là Triệu Phú" trên mạng LAN, gồm 3 màn hình:
+Bộ phần mềm điều khiển game show "Ai Là Triệu Phú" chạy trong mạng LAN, dành cho sân khấu nhỏ, lớp học, sự kiện nội bộ hoặc ghi hình thử nghiệm.
 
-- `host_gui.py`: bảng điều khiển cho MC/host, đồng thời chạy server socket.
-- `client_gui.py`: màn hình thí sinh, có ảnh nút trả lời và nhạc hiệu.
-- `viewer.py`: màn hình khán giả theo dõi câu hỏi, đáp án và tiến trình.
+Phần mềm gồm 3 ứng dụng độc lập:
 
-## Yêu cầu
+- **Ai Là Triệu Phú (Host)**: bảng điều khiển cho MC/kỹ thuật, đồng thời là server game.
+- **Ai Là Triệu Phú (Người Chơi)**: màn hình thí sinh chọn đáp án và dùng trợ giúp.
+- **Ai Là Triệu Phú (Khán Giả)**: màn hình trình chiếu cho viewer, bảng tiền thưởng, credit, nghỉ giải lao và poll.
+
+Tác giả/phát triển: **Duli Production LLC.**
+
+Bản quyền: **2020 - 2026 Duli Production LLC.**
+
+## Tải Bản Cài
+
+Vào mục **Releases** trên GitHub và chọn đúng hệ điều hành.
+
+### Windows
+
+Tải file:
+
+```text
+AiLaTrieuPhu-Windows-Installer-windows_vX.Y.Z.zip
+```
+
+Giải nén rồi chạy:
+
+```text
+Install-AiLaTrieuPhu.cmd
+```
+
+Installer sẽ cho chọn một trong ba bản:
+
+- Host
+- Người Chơi
+- Khán Giả
+
+Sau khi chọn, installer chỉ tải đúng gói cần dùng từ GitHub Release để tránh bộ cài Windows quá nặng. Shortcut ngoài Desktop vẫn dùng tên tiếng Việt đầy đủ.
+
+Nếu Windows chặn script, mở PowerShell tại thư mục installer và chạy:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Install-AiLaTrieuPhu.ps1
+```
+
+### macOS
+
+Tải file:
+
+```text
+AiLaTrieuPhu-macOS-Installer-macos_vX.Y.Z.zip
+```
+
+Giải nén rồi chạy:
+
+```text
+Install-AiLaTrieuPhu.command
+```
+
+Installer sẽ tự nhận máy Apple Silicon hoặc Intel, sau đó tải đúng file `.pkg` của Host, Người Chơi hoặc Khán Giả.
+
+Ứng dụng hiện chưa ký Developer ID, nên macOS có thể cảnh báo app tải từ Internet. Cách mở thủ công: right-click app hoặc installer, chọn **Open**, sau đó xác nhận mở.
+
+## Kết Nối LAN
+
+1. Mở **Host** trước.
+2. Host sẽ hiển thị IP LAN và port `65432`.
+3. Mở **Người Chơi**, nhập tên thí sinh và IP của máy Host.
+4. Mở một hoặc nhiều **Khán Giả**, nhập cùng IP Host.
+
+Giới hạn phiên chạy:
+
+- Host chỉ nên chạy 1 instance.
+- Người Chơi chỉ nên chạy 1 instance trên một máy.
+- Khán Giả có thể mở nhiều máy/màn hình.
+
+Nếu máy khác không kết nối được, kiểm tra cùng mạng Wi-Fi/LAN, Windows Firewall, IP Host và port `65432`.
+
+## Luồng Game Chính
+
+- Câu 1 đến 5 chạy liên tục, không cần bấm sẵn sàng giữa các câu.
+- Từ câu 6 trở đi, Người Chơi cần xác nhận sẵn sàng; Host vẫn có nút ép bắt đầu nếu client bị kẹt.
+- Từ câu 6, đáp án được chọn sẽ hiện cho viewer trước, nhưng Host là người công bố đúng/sai.
+- Host có nút **Give Up** từ câu 6. Sau khi give up, thí sinh vẫn được chọn đáp án để "tiếc nuối", rồi Host unlock đáp án và kết màn hình.
+- Nếu give up, tiền thưởng là số tiền đã trả lời đúng trước đó, không phải mốc tiền của câu đang hỏi.
+- Nếu trả lời đúng cả 15 câu, màn hình kết thúc dùng lời chúc mừng riêng: **CHÚC MỪNG TRIỆU PHÚ**.
+
+## Mốc Tiền Thưởng
+
+Cây tiền thưởng hiện dùng format mới:
+
+```text
+15 - 500.000.000 VNĐ
+14 - 250.000.000 VNĐ
+13 - 120.000.000 VNĐ
+12 - 60.000.000 VNĐ
+11 - 30.000.000 VNĐ
+10 - 22.000.000 VNĐ
+09 - 14.000.000 VNĐ
+08 - 10.000.000 VNĐ
+07 - 8.000.000 VNĐ
+06 - 6.000.000 VNĐ
+05 - 5.000.000 VNĐ
+04 - 4.000.000 VNĐ
+03 - 3.000.000 VNĐ
+02 - 2.000.000 VNĐ
+01 - 1.000.000 VNĐ
+```
+
+Luật tiền thưởng:
+
+- Sai trước câu 6: nhận `0 VNĐ`.
+- Sai từ câu 6 đến 10: nhận `5.000.000 VNĐ`.
+- Sai từ câu 11 đến 15: nhận `22.000.000 VNĐ`.
+- Đúng cả 15 câu: nhận `500.000.000 VNĐ`.
+
+## Trợ Giúp
+
+Các trợ giúp hiện có:
+
+- **50:50**: loại hai đáp án sai.
+- **Khán Giả**: mở poll 30 giây, có delay 2 giây để nhạc hiệu chạy hết nốt.
+- **Gọi Điện**: chạy 30 giây, Host có ô nhập gợi ý đáp án.
+- **Tư Vấn**: gợi ý theo xác suất 50/50, không luôn đúng 100%.
+
+Khi bấm trợ giúp, hệ thống phát hiệu ứng trước, chờ ngắn rồi mới mở kết quả. Logic audio đã tách để tránh chồng âm khi dùng trợ giúp liên tiếp.
+
+## Pack Câu Hỏi
+
+Các pack đề nằm ở root repo theo dạng:
+
+```text
+questions_pack1.json
+questions_pack2.json
+questions_pack3.json
+...
+```
+
+Host có tab kỹ thuật để:
+
+- Xem pack.
+- Import pack JSON mới.
+- Lưu trữ pack.
+- Kích hoạt lại pack.
+- Xóa pack.
+
+Sau mỗi lượt chơi, hệ thống tự shuffle/chọn pack cho người chơi tiếp theo. Pack có counter số lần dùng; nếu vượt ngưỡng dùng quá nhiều, pack sẽ chuyển sang lưu trữ để tránh lặp câu.
+
+Poll khán giả dùng câu hỏi từ pack riêng. Khi Host công bố một câu poll, câu đó sẽ bị đánh dấu đã dùng. Nếu không đổi đáp án sau thời gian chờ hoặc Host chốt, hệ thống chọn người chơi backup theo đáp án đúng.
+
+## Tài Nguyên
+
+Đặt tài nguyên trong các thư mục:
+
+```text
+audio/
+images/
+```
+
+Các file ảnh quan trọng:
+
+```text
+images/logo.png
+images/background.png
+images/app.ico       # tùy chọn cho Windows
+images/app.icns      # tùy chọn cho macOS
+```
+
+Các file âm thanh nên có:
+
+```text
+audio/welcome.mp3
+audio/ready.mp3
+audio/wait_1_5.mp3
+audio/wait_6_10.mp3
+audio/wait_11_15.mp3
+audio/lifeline_click.mp3
+audio/lifeline_5050.mp3
+audio/audience_countdown.mp3
+audio/lifeline_call.mp3
+audio/lifeline_wise_man.mp3
+audio/viewer_break.mp3
+audio/viewer_poll.mp3
+audio/program_end.mp3
+audio/end_buzzer.mp3
+audio/correct.wav
+audio/wrong.wav
+audio/selected.wav
+```
+
+Nếu thiếu file âm thanh, app vẫn chạy nhưng sẽ bỏ qua hiệu ứng tương ứng.
+
+## Chạy Từ Source
+
+Yêu cầu:
 
 - Python 3.10+
-- Pillow để load/resize ảnh giao diện.
-- Pygame là tùy chọn. Nếu không có Pygame, bản Windows sẽ tự phát MP3/WAV bằng audio backend hệ thống.
+- Pillow
+- Pygame
 
 Cài thư viện:
 
@@ -18,57 +205,7 @@ Cài thư viện:
 pip install -r requirements.txt
 ```
 
-## Tài nguyên
-
-Đặt tài nguyên ở đúng cấu trúc này:
-
-```text
-audio/
-  welcome.mp3
-  ready.mp3
-  wait_1_5.mp3
-  wait_6_10.mp3
-  wait_11_15.mp3
-  lifeline.mp3
-  lifeline_click.wav hoặc lifeline_click.mp3
-  lifeline_5050.mp3 hoặc lifeline_5050.wav
-  audience_countdown.mp3 hoặc audience_countdown.wav
-  lifeline_call.mp3 hoặc lifeline_call.wav
-  lifeline_wise_man.mp3 hoặc lifeline_wise_man.wav
-  win.mp3
-  complete.mp3 hoặc complete.wav
-  program_end.mp3 hoặc program_end.wav
-  end_buzzer.wav hoặc end_buzzer.mp3
-  viewer_game.mp3 hoặc viewer_game.wav
-  viewer_prize.mp3 hoặc viewer_prize.wav
-  viewer_break.mp3 hoặc viewer_break.wav
-  viewer_technical.mp3 hoặc viewer_technical.wav
-  viewer_blank.wav hoặc viewer_blank.mp3
-  viewer_stats.mp3 hoặc viewer_stats.wav
-  viewer_credits.mp3 hoặc viewer_credits.wav
-  viewer_mini_quiz.mp3 hoặc viewer_mini_quiz.wav
-  viewer_poll.mp3 hoặc viewer_poll.wav
-  selected.wav
-  correct.wav
-  wrong.wav
-  end_game.wav
-images/
-  background.png hoặc background.jpg
-  logo.png
-  button_normal.png
-  button_selected.png
-  button_correct.png
-  button_wrong.png
-questions_pack1.json
-questions_pack2.json
-...
-```
-
-Code hiện dùng đường dẫn theo thư mục repo, nên có thể chạy script từ nơi khác mà vẫn tìm được `audio/`, `images/` và các gói câu hỏi.
-
-## Chạy nhanh
-
-Trên Windows, nên double-click các file `.pyw` để chạy không hiện cửa sổ terminal:
+Chạy không hiện terminal trên Windows:
 
 ```text
 run_host.pyw
@@ -76,89 +213,15 @@ run_client.pyw
 run_viewer.pyw
 ```
 
-Nếu muốn xem log/debug trong terminal, chạy trực tiếp các file `.py` bên dưới.
-
-Trên máy host:
+Chạy có log/debug:
 
 ```powershell
 python host_gui.py
-```
-
-Host sẽ hiển thị IP LAN và port `65432` trong nhật ký server.
-
-Trên máy thí sinh:
-
-```powershell
 python client_gui.py
-```
-
-Nhập tên thí sinh và IP server.
-
-Trên máy khán giả:
-
-```powershell
 python viewer.py
 ```
 
-Nhập IP server. Viewer có thể mở trước hoặc sau client; server sẽ phân loại đúng viewer/thí sinh qua gói định danh đầu tiên.
-
-## Cách chơi
-
-Host mở `host_gui.py`, thí sinh mở `client_gui.py`, khán giả mở `viewer.py`. Mỗi lượt chơi dùng ngẫu nhiên một file `questions_pack*.json`. Thí sinh có các trợ giúp `50:50`, `Khán Giả`, `Gọi Điện`, và `Tư Vấn` từ câu 6 trở đi.
-
-## Luồng điều khiển Host
-
-- Host có nút `Bắt đầu câu` để ép chuyển sang câu hỏi khi client không bấm được nút sẵn sàng.
-- Từ câu 1 đến câu 5, đáp án được công bố tự động sau khi thí sinh chọn.
-- Từ câu 6 trở đi, thí sinh chọn đáp án trước, viewer thấy đáp án đó ngay, nhưng host phải bấm `Công bố đáp án` để reveal đúng/sai.
-- Trợ giúp `Gọi Điện` chỉ còn độ tin cậy 50/50.
-- Mỗi lần bấm trợ giúp sẽ chạy hiệu ứng âm thanh trước, sau 5 giây mới mở/trả kết quả trợ giúp.
-- Trợ giúp `Khán Giả` có giới hạn 30 giây trên bảng host, mở sau 2 giây để nhạc hiệu chạy hết nốt; hết giờ sẽ tự chốt dữ liệu đang nhập.
-
-## Scene Và Phím Điều Khiển
-
-Ghi chú cập nhật:
-
-- Từ câu 1 đến câu 5, game tự chạy liên tục, không hiện nút sẵn sàng giữa các câu.
-- Từ câu 6 trở đi mới giữ bước xác nhận sẵn sàng và host có thể bấm `Bắt đầu câu` nếu client bị đơ phím.
-- Cây tiền thưởng hiện theo mốc 2026: cao nhất `500.000.000 VNĐ`, mốc an toàn sau câu 5 là `5.000.000 VNĐ`, sau câu 10 là `22.000.000 VNĐ`.
-- Trợ giúp `Tư Vấn` gợi ý theo xác suất 50/50 thay vì luôn đúng.
-- Nếu trả lời sai ở câu 1-5 nhận `0 VNĐ`, câu 6-10 nhận `5.000.000 VNĐ`, câu 11-15 nhận `22.000.000 VNĐ`.
-- Màn kết thúc không dùng popup thắng/thua nữa, mà hiện trực tiếp tên thí sinh và số tiền nhận được.
-
-Host có thêm các scene cho viewer:
-
-- `Game`: quay lại câu hỏi hiện tại, đề xuất `viewer_game.wav` là một sting ngắn.
-- `Bảng thưởng`: hiện bảng tiền thưởng, đề xuất `viewer_prize.mp3` là nhạc bảng tiền.
-- `Nghỉ 5 phút`: màn giải lao có countdown, đề xuất `viewer_break.mp3` là nhạc chờ loop.
-- `Technical`: màn chờ kỹ thuật, đề xuất `viewer_technical.mp3` là nhạc nền nhẹ loop.
-- `Blank`: màn đen khẩn cấp, đề xuất `viewer_blank.wav` là tiếng cắt tín hiệu ngắn.
-- `Stats`: thống kê lượt chơi hiện tại, đề xuất `viewer_stats.wav` là sting dữ liệu ngắn.
-- `Credits`: slide credit/sponsor, đề xuất `viewer_credits.mp3` là nhạc credit loop.
-- `Mini quiz`: nội dung tương tác nhẹ, đề xuất `viewer_mini_quiz.wav`.
-- `Poll`: dự đoán khán giả, đề xuất `viewer_poll.wav`.
-
-Host có thêm nút kỹ thuật:
-
-- `Hủy chốt đáp án`: cho phép thí sinh chọn lại trước khi công bố.
-- `Resend`: phát lại trạng thái hiện tại cho client/viewer.
-- `Sửa câu hiện tại`: sửa nhanh câu hỏi, 4 phương án và đáp án đúng.
-- `Đổi câu`: lấy câu dự phòng cùng level từ các gói câu hỏi.
-- `Nhạc căng` / `Dừng nhạc`: điều khiển nhạc client thủ công.
-
-Hotkey:
-
-- `Enter`: bắt đầu câu khi đang chờ ready.
-- `Space`: công bố đáp án đang chốt.
-- `P`: tạm dừng / tiếp tục.
-- `M`: tắt / bật nhạc client.
-- `R`: resend trạng thái.
-- `B`: màn nghỉ 5 phút.
-- `Esc`: blank screen.
-
-## Build Desktop
-
-Script đóng gói nằm trong [`packaging/`](packaging/README.md).
+## Build Từ Source
 
 Windows:
 
@@ -172,22 +235,63 @@ macOS:
 bash packaging/build_macos.sh
 ```
 
-Windows sẽ sinh `.exe` trong `dist/`. macOS sẽ sinh `.app` và `.pkg` trong `dist/`. Các build này tự gom `audio/`, `images/` và `questions_*.json`.
+Build một role:
 
-Nếu không có máy Mac, dùng GitHub Actions workflow `Build desktop apps` để build macOS artifact trực tiếp trên GitHub.
-
-Để tạo GitHub Release tự động, push tag dạng `v1.0.0`:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
+```powershell
+.\packaging\build_windows.bat -Target host
+.\packaging\build_windows.bat -Target client
+.\packaging\build_windows.bat -Target viewer
 ```
 
-Để tạo riêng release macOS:
+Chi tiết build nằm ở [packaging/README.md](packaging/README.md).
+
+## Tạo Release
+
+Version nằm trong [app_info.py](app_info.py).
+
+Quy ước version:
+
+- `1.x.x`: bản lớn, thay đổi nhiều.
+- `x.1.x`: bản vừa hoặc fix ổn định.
+- `x.x.1`: bản vá nhỏ.
+
+Tạo release Windows:
 
 ```bash
-git tag macos_v1.0.0
-git push origin macos_v1.0.0
+git tag windows_v1.1.3
+git push origin windows_v1.1.3
 ```
 
-Workflow macOS riêng target macOS 14 và sinh hai gói `.pkg`: `arm64-macos14` cho Apple Silicon, `intel-macos14` cho Mac Intel.
+Tạo release macOS:
+
+```bash
+git tag macos_v1.1.3
+git push origin macos_v1.1.3
+```
+
+Workflow sẽ upload:
+
+- Windows installer selector.
+- Windows role zip cho Host/Người Chơi/Khán Giả.
+- macOS installer selector.
+- macOS role pkg cho Apple Silicon và Intel.
+
+## Ghi Chú Phát Hành
+
+Các app build ra dùng tên kỹ thuật không dấu để tránh lỗi Unicode trong Windows/GitHub Actions:
+
+```text
+AiLaTrieuPhu-Host
+AiLaTrieuPhu-Client
+AiLaTrieuPhu-Viewer
+```
+
+Tên hiển thị với người dùng vẫn là:
+
+```text
+Ai Là Triệu Phú (Host)
+Ai Là Triệu Phú (Người Chơi)
+Ai Là Triệu Phú (Khán Giả)
+```
+
+Đây là chủ ý để bản Win/mac dễ build, dễ tải, nhưng ngoài Desktop/Applications vẫn nhìn đúng tên chương trình.

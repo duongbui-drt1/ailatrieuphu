@@ -35,17 +35,24 @@ APP_ICON_SOURCE = ROOT_DIR / "images" / "logo.png"
 APPS = {
     "host": {
         "entry": "run_host.pyw",
-        "name": "Ai Là Triệu Phú (Host)",
+        "name": "AiLaTrieuPhu-Host",
+        "display_name": "Ai Là Triệu Phú (Host)",
     },
     "client": {
         "entry": "run_client.pyw",
-        "name": "Ai Là Triệu Phú (Người Chơi)",
+        "name": "AiLaTrieuPhu-Client",
+        "display_name": "Ai Là Triệu Phú (Người Chơi)",
     },
     "viewer": {
         "entry": "run_viewer.pyw",
-        "name": "Ai Là Triệu Phú (Khán Giả)",
+        "name": "AiLaTrieuPhu-Viewer",
+        "display_name": "Ai Là Triệu Phú (Khán Giả)",
     },
 }
+
+
+def app_display_name(app_key: str) -> str:
+    return APPS[app_key].get("display_name", APPS[app_key]["name"])
 
 
 def data_files() -> list[tuple[Path, str]]:
@@ -170,7 +177,7 @@ def windows_version_file(app_key: str, version: str) -> Path:
     app = APPS[app_key]
     output = icon_output_dir() / f"{app['name']}-version.txt"
     file_version = version_tuple(version)
-    file_description = f"{APP_DESCRIPTION} - {app_key.title()}"
+    file_description = f"{APP_DESCRIPTION} - {app_display_name(app_key)}"
     output.write_text(
         f"""# UTF-8
 VSVersionInfo(
@@ -213,6 +220,7 @@ def apply_macos_bundle_metadata(app_key: str, version: str) -> None:
     if sys.platform != "darwin":
         return
     app = APPS[app_key]
+    display_name = app_display_name(app_key)
     plist_path = DIST_DIR / f"{app['name']}.app" / "Contents" / "Info.plist"
     if not plist_path.exists():
         return
@@ -221,7 +229,8 @@ def apply_macos_bundle_metadata(app_key: str, version: str) -> None:
         plist = plistlib.load(file)
     plist.update(
         {
-            "CFBundleDisplayName": app["name"],
+            "CFBundleDisplayName": display_name,
+            "CFBundleName": display_name,
             "CFBundleGetInfoString": f"{APP_PRODUCT_NAME} {version}, {APP_AUTHOR}",
             "CFBundleIdentifier": f"{APP_IDENTIFIER_ROOT}.{app_key}",
             "CFBundleShortVersionString": version,
@@ -288,7 +297,7 @@ def run_pyinstaller(app_key: str, onefile: bool, version: str) -> None:
 
     args.extend(["--hidden-import", "tkinter", "--hidden-import", "_tkinter"])
 
-    print(f"\n==> Building {app['name']}")
+    print(f"\n==> Building {app_display_name(app_key)} [{app['name']}]")
     pyinstaller.run(args)
     apply_macos_bundle_metadata(app_key, version)
 
@@ -305,10 +314,11 @@ def build_macos_pkg(app_keys: list[str], version: str) -> None:
 
     for app_key in app_keys:
         app_name = APPS[app_key]["name"]
+        display_name = app_display_name(app_key)
         app_bundle = DIST_DIR / f"{app_name}.app"
         if not app_bundle.exists():
             raise SystemExit(f"Missing app bundle for pkg: {app_bundle}")
-        shutil.copytree(app_bundle, applications_dir / app_bundle.name)
+        shutil.copytree(app_bundle, applications_dir / f"{display_name}.app")
 
     package_name = "AiLaTrieuPhu.pkg" if len(app_keys) > 1 else f"{APPS[app_keys[0]]['name']}.pkg"
     package_path = DIST_DIR / package_name

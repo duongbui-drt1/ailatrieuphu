@@ -50,25 +50,33 @@ jobs:
           $Target = "${{ github.event.inputs.target }}"
           if (-not $Target) { $Target = "all" }
           $Roles = @(
-            @{ Key = "host"; Display = "Ai Là Triệu Phú (Host)" },
-            @{ Key = "client"; Display = "Ai Là Triệu Phú (Người Chơi)" },
-            @{ Key = "viewer"; Display = "Ai Là Triệu Phú (Khán Giả)" }
+            @{ Key = "host"; Display = "Ai Là Triệu Phú (Host)"; Output = "AiLaTrieuPhu-Host" },
+            @{ Key = "client"; Display = "Ai Là Triệu Phú (Người Chơi)"; Output = "AiLaTrieuPhu-Client" },
+            @{ Key = "viewer"; Display = "Ai Là Triệu Phú (Khán Giả)"; Output = "AiLaTrieuPhu-Viewer" }
           )
 
+          Write-Host "Dist outputs:"
+          Get-ChildItem dist | Format-Table Name, Length
+
+          $Missing = @()
           foreach ($Role in $Roles) {
             if ($Target -ne "all" -and $Target -ne $Role.Key) {
               continue
             }
-            $AppDir = Join-Path "dist" $Role.Display
-            $AppExe = Join-Path "dist" "$($Role.Display).exe"
+            $AppDir = Join-Path "dist" $Role.Output
+            $AppExe = Join-Path "dist" "$($Role.Output).exe"
             $ZipPath = "release\AiLaTrieuPhu-Windows-$($Role.Key)-$Tag.zip"
             if (Test-Path $AppDir) {
               Compress-Archive -Path $AppDir -DestinationPath $ZipPath -Force
             } elseif (Test-Path $AppExe) {
               Compress-Archive -Path $AppExe -DestinationPath $ZipPath -Force
             } else {
-              Write-Warning "Missing Windows app output for $($Role.Display)"
+              $Missing += "$($Role.Key) -> $($Role.Output)"
             }
+          }
+
+          if ($Missing.Count -gt 0) {
+            throw "Missing Windows app output: $($Missing -join ', ')"
           }
 
           $InstallerDir = "release\installer-windows"

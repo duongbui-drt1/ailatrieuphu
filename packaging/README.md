@@ -10,6 +10,14 @@ The build scripts package `audio/`, `images/`, and every `questions_*.json` file
 
 App icons are generated from `images/logo.png` during the build. To override them, add `images/app.ico` for Windows or `images/app.icns` for macOS.
 
+Build outputs use stable ASCII technical names so GitHub Actions and Windows zip tooling do not trip on Unicode paths:
+
+- `AiLaTrieuPhu-Host`
+- `AiLaTrieuPhu-Client`
+- `AiLaTrieuPhu-Viewer`
+
+Installers and shortcuts still use the Vietnamese display names.
+
 ## Windows .exe
 
 Run from the repo root:
@@ -35,7 +43,7 @@ Build only one role:
 Default output is a stable one-folder app under `dist/`, for example:
 
 ```text
-dist/Ai Là Triệu Phú (Host)/Ai Là Triệu Phú (Host).exe
+dist/AiLaTrieuPhu-Host/AiLaTrieuPhu-Host.exe
 ```
 
 For a single-file executable:
@@ -73,54 +81,32 @@ The script creates `.app` bundles in `dist/` and an unsigned `.pkg` installer. T
 
 Unsigned macOS apps may require right-clicking and choosing Open the first time, or signing/notarization for public distribution.
 
-## Build on GitHub Actions
+## Create GitHub Releases
 
-If you do not have a Mac, push the repo to GitHub and run the `Build desktop apps` workflow:
+Push an OS-specific tag. Each workflow builds only one operating system and uploads a thin installer plus role-specific packages.
 
-1. Open the repo on GitHub.
-2. Go to `Actions`.
-3. Choose `Build desktop apps`.
-4. Click `Run workflow`.
-5. Choose `all`, `host`, `client`, or `viewer`.
-6. Download `AiLaTrieuPhu-macOS` from the workflow artifacts.
-
-The macOS artifact contains unsigned `.app` bundles and `.pkg` installers. For public distribution without Gatekeeper warnings, sign and notarize them with an Apple Developer ID.
-
-## Create a GitHub Release
-
-Push a version tag. The workflow will build Windows/macOS artifacts and create a GitHub Release automatically:
+For a Windows release:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag windows_v1.1.3
+git push origin windows_v1.1.3
 ```
 
-Use a new tag for each release, for example `v1.0.1`, `v1.1.0`, or `v2.0.0`.
+The Windows workflow uploads:
 
-To delete and redo a bad local tag:
+- `AiLaTrieuPhu-Windows-Installer-windows_v1.1.3.zip`
+- `AiLaTrieuPhu-Windows-host-windows_v1.1.3.zip`
+- `AiLaTrieuPhu-Windows-client-windows_v1.1.3.zip`
+- `AiLaTrieuPhu-Windows-viewer-windows_v1.1.3.zip`
 
-```bash
-git tag -d v1.0.0
-git push origin :refs/tags/v1.0.0
-```
-
-For a macOS-only release, push an OS-specific tag:
+For a macOS release:
 
 ```bash
-git tag macos_v1.0.0
-git push origin macos_v1.0.0
+git tag macos_v1.1.3
+git push origin macos_v1.1.3
 ```
 
 The macOS-only workflow uploads role-specific `.pkg` files and a small installer selector. Users can download the installer selector, choose Host/Người Chơi/Khán Giả, and fetch only the needed package.
-
-For a Windows-only release, push a Windows-specific tag:
-
-```bash
-git tag windows_v1.0.1
-git push origin windows_v1.0.1
-```
-
-The Windows-only workflow uploads role-specific zip files and a small installer selector. Users can download the installer selector, choose Host/Người Chơi/Khán Giả, and fetch only the needed app zip.
 
 The macOS-only workflow targets macOS 14. It builds two packages:
 

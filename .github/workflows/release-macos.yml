@@ -86,20 +86,21 @@ jobs:
 
           pack_role() {
             role="$1"
-            display="$2"
+            output="$2"
+            display="$3"
             if [ "$TARGET" != "all" ] && [ "$TARGET" != "$role" ]; then
               return 0
             fi
 
-            app="dist/${display}.app"
+            app="dist/${output}.app"
             if [ ! -d "$app" ]; then
               echo "Missing macOS app bundle: $app"
-              return 0
+              return 1
             fi
 
             pkgroot="$(mktemp -d)"
             mkdir -p "$pkgroot/Applications"
-            cp -R "$app" "$pkgroot/Applications/"
+            cp -R "$app" "$pkgroot/Applications/${display}.app"
             pkg="release/AiLaTrieuPhu-macOS-${role}-${{ matrix.arch }}-macos14.pkg"
             pkgbuild \
               --root "$pkgroot" \
@@ -110,9 +111,9 @@ jobs:
             rm -rf "$pkgroot"
           }
 
-          pack_role "host" "Ai Là Triệu Phú (Host)"
-          pack_role "client" "Ai Là Triệu Phú (Người Chơi)"
-          pack_role "viewer" "Ai Là Triệu Phú (Khán Giả)"
+          pack_role "host" "AiLaTrieuPhu-Host" "Ai Là Triệu Phú (Host)"
+          pack_role "client" "AiLaTrieuPhu-Client" "Ai Là Triệu Phú (Người Chơi)"
+          pack_role "viewer" "AiLaTrieuPhu-Viewer" "Ai Là Triệu Phú (Khán Giả)"
 
           if [ "${{ matrix.arch }}" = "arm64" ]; then
             installer_dir="release/installer-macos"
