@@ -3,6 +3,15 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+try {
+    $Utf8Encoding = New-Object System.Text.UTF8Encoding $false
+    [Console]::InputEncoding = $Utf8Encoding
+    [Console]::OutputEncoding = $Utf8Encoding
+    $OutputEncoding = $Utf8Encoding
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+} catch {
+}
+
 $Repo = "__REPO__"
 $Tag = "__TAG__"
 
@@ -54,7 +63,15 @@ $ExtractedDir = Join-Path $ExtractRoot $Role.Folder
 Write-Host ""
 Write-Host "Đang tải $($Role.Display)..." -ForegroundColor Cyan
 Write-Host $Url
-Invoke-WebRequest -Uri $Url -OutFile $TempZip
+try {
+    Invoke-WebRequest -Uri $Url -OutFile $TempZip -UseBasicParsing
+} catch {
+    Write-Host ""
+    Write-Host "Không tải được gói cài đặt: $($Role.Asset)" -ForegroundColor Red
+    Write-Host "Nếu release vừa được tạo, hãy chờ GitHub Actions upload xong toàn bộ asset rồi chạy lại installer."
+    Write-Host "Release: https://github.com/$Repo/releases/tag/$Tag"
+    throw
+}
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 foreach ($Path in @($TargetDir, $ExtractRoot)) {

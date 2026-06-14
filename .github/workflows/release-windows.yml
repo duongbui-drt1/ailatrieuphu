@@ -86,7 +86,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path $InstallerDir | Out-Null
           $Installer = Get-Content "packaging\installers\windows\Install-AiLaTrieuPhu.ps1.in" -Raw
           $Installer = $Installer.Replace("__REPO__", "${{ github.repository }}").Replace("__TAG__", $Tag)
-          Set-Content -Path (Join-Path $InstallerDir "Install-AiLaTrieuPhu.ps1") -Value $Installer -Encoding UTF8
+          $Utf8Bom = New-Object System.Text.UTF8Encoding $true
+          [System.IO.File]::WriteAllText((Join-Path $InstallerDir "Install-AiLaTrieuPhu.ps1"), $Installer, $Utf8Bom)
           Copy-Item "packaging\installers\windows\Install-AiLaTrieuPhu.cmd" (Join-Path $InstallerDir "Install-AiLaTrieuPhu.cmd") -Force
           Compress-Archive -Path "$InstallerDir\*" -DestinationPath "release\AiLaTrieuPhu-Windows-Installer-$Tag.zip" -Force
 
@@ -100,7 +101,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           $Tag = "${{ github.ref_name }}"
-          $Zips = @(Get-ChildItem release -Filter *.zip)
+          $Zips = @(Get-ChildItem release -Filter *.zip | Sort-Object @{ Expression = { if ($_.Name -like "*Installer*") { 1 } else { 0 } } }, Name)
           if ($Zips.Count -eq 0) {
             throw "No Windows release zip files found."
           }

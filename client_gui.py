@@ -59,6 +59,8 @@ class GameClientGUI(tk.Toplevel):
         self.answer_buttons_locked = False
         self.blinking_job = None
         self.last_background_music = None
+        self._last_canvas_size = None
+        self._last_panel_size = None
 
         self.load_assets()
         self.create_widgets()
@@ -233,19 +235,22 @@ class GameClientGUI(tk.Toplevel):
         )
 
     def draw_gradient(self, event):
-        self.canvas.delete("gradient")
         width, height = event.width, event.height
         if width <= 0 or height <= 0:
             return
 
-        self.gradient_image = render_background(
-            self.background_source,
-            (width, height),
-            GRADIENT_START,
-            GRADIENT_END,
-        )
-        self.canvas.create_image(0, 0, image=self.gradient_image, anchor="nw", tags="gradient")
-        self.canvas.tag_lower("gradient")
+        size = (width, height)
+        if self._last_canvas_size != size:
+            self.canvas.delete("gradient")
+            self.gradient_image = render_background(
+                self.background_source,
+                size,
+                GRADIENT_START,
+                GRADIENT_END,
+            )
+            self.canvas.create_image(0, 0, image=self.gradient_image, anchor="nw", tags="gradient")
+            self.canvas.tag_lower("gradient")
+            self._last_canvas_size = size
         self.update_panel_backgrounds(width, height)
 
     def update_panel_backgrounds(self, width, height):
@@ -255,6 +260,10 @@ class GameClientGUI(tk.Toplevel):
         main_width = max(1, int(width * 0.75))
         prize_width = max(1, width - main_width)
         game_height = max(1, int(height * 0.74))
+        panel_size = (main_width, prize_width, height, game_height)
+        if self._last_panel_size == panel_size:
+            return
+        self._last_panel_size = panel_size
 
         self.main_background_image = render_background(
             self.background_source,
@@ -371,6 +380,18 @@ class GameClientGUI(tk.Toplevel):
             anchor=tk.CENTER,
         )
 
+    def set_answer_buttons_hover(self, enabled):
+        for btn in self.option_buttons.values():
+            btn.config(hover_enabled=enabled)
+
+    def style_answer_button(self, option, state, hover_enabled=None):
+        if hover_enabled is None:
+            hover_enabled = state == "normal"
+        self.option_buttons[option].config(
+            image=self.btn_images[state],
+            hover_enabled=hover_enabled,
+        )
+
     def update_question_display(self, data):
         self.stop_blinking_animation()
         self.game_has_ended = False
@@ -387,7 +408,8 @@ class GameClientGUI(tk.Toplevel):
             if option_text:
                 btn.place(relx=pos['relx'], rely=pos['rely'], anchor=tk.CENTER, width=470, height=82)
                 self.set_option_button_text(option, option_text)
-                btn.config(state="normal", image=self.btn_images['normal'])
+                btn.config(state="normal")
+                self.style_answer_button(option, "normal", hover_enabled=True)
             else:
                 btn.place_forget()
 
@@ -443,9 +465,10 @@ class GameClientGUI(tk.Toplevel):
 
     def set_visible_answer_buttons_state(self, state):
         self.answer_buttons_locked = state != "normal"
+        hover_enabled = state == "normal"
         for btn in self.option_buttons.values():
             if btn.winfo_ismapped():
-                btn.config(state="normal")
+                btn.config(state="normal", hover_enabled=hover_enabled)
 
     def handle_lifeline_result(self, data):
         lifeline_type = data.get('lifeline', 'unknown')
@@ -476,12 +499,13 @@ class GameClientGUI(tk.Toplevel):
         self.answer_buttons_locked = True
         self.audio_manager.play('selected')
 
+        self.set_answer_buttons_hover(False)
         for btn in self.option_buttons.values():
             btn.config(state="normal")
         for btn in self.lifeline_buttons.values():
             btn.config(state="disabled")
 
-        self.option_buttons[answer].config(image=self.btn_images['selected'])
+        self.style_answer_button(answer, "selected", hover_enabled=False)
         self.send_data({
             'action': 'answer_locked',
             'value': answer,
@@ -527,14 +551,15 @@ class GameClientGUI(tk.Toplevel):
 
         # Show correct/wrong answers
         player_answer = data.get('player_answer')
+        self.set_answer_buttons_hover(False)
         for key, btn in self.option_buttons.items():
             if btn.winfo_ismapped():
                 if key == correct_answer:
-                    btn.config(image=self.btn_images['correct'])
+                    self.style_answer_button(key, "correct", hover_enabled=False)
                 elif key == player_answer:
-                    btn.config(image=self.btn_images['selected'])
+                    self.style_answer_button(key, "selected", hover_enabled=False)
                 else:
-                    btn.config(image=self.btn_images['normal'])
+                    self.style_answer_button(key, "normal", hover_enabled=False)
         self.force_repaint()
 
         if data.get('give_up_regret'):
@@ -578,7 +603,8 @@ class GameClientGUI(tk.Toplevel):
         self.answer_buttons_locked = False
         for option, btn in self.option_buttons.items():
             if btn.winfo_ismapped():
-                btn.config(state="normal", image=self.btn_images['normal'])
+                btn.config(state="normal")
+                self.style_answer_button(option, "normal", hover_enabled=True)
         self.update_lifeline_buttons()
         self.status_bar.config(text="Host đã hủy chốt đáp án. Vui lòng chọn lại.")
 

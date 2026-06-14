@@ -99,6 +99,7 @@ class ColorButton(tk.Label):
         cursor="hand2",
         **kwargs,
     ):
+        hover_enabled = kwargs.pop("hover_enabled", True)
         self._command = command
         self._normal_bg = bg
         self._normal_fg = fg
@@ -109,6 +110,7 @@ class ColorButton(tk.Label):
         self._enabled = str(state) != str(tk.DISABLED)
         self._cursor = cursor
         self._pressed = False
+        self._hover_enabled = bool(hover_enabled)
         kwargs.pop("state", None)
         kwargs.setdefault("bg", bg)
         kwargs.setdefault("fg", fg)
@@ -151,6 +153,10 @@ class ColorButton(tk.Label):
             self._disabled_bg = kwargs.pop("disabledbackground")
         if "disabledforeground" in kwargs:
             self._disabled_fg = kwargs.pop("disabledforeground")
+        if "hover_enabled" in kwargs:
+            self._hover_enabled = bool(kwargs.pop("hover_enabled"))
+            if not self._hover_enabled:
+                self._pressed = False
 
         super().configure(**kwargs)
         if state is not None:
@@ -172,6 +178,7 @@ class ColorButton(tk.Label):
         self._apply_visual()
 
     def _apply_visual(self, active=False, focused=False):
+        active = active and self._hover_enabled
         if not self._enabled:
             bg = self._disabled_bg
             fg = self._disabled_fg
@@ -180,12 +187,14 @@ class ColorButton(tk.Label):
         else:
             bg = self._active_bg if active else self._normal_bg
             fg = self._active_fg if active else self._normal_fg
-            relief = tk.SUNKEN if self._pressed else tk.FLAT
-            cursor = self._cursor
+            relief = tk.SUNKEN if self._pressed and self._hover_enabled else tk.FLAT
+            cursor = self._cursor if self._hover_enabled else "arrow"
         highlight = self._active_bg if (active or focused) and self._enabled else _blend_hex(bg, "#ffffff", 0.18)
         super().configure(bg=bg, fg=fg, cursor=cursor, relief=relief, highlightbackground=highlight)
 
     def _enter(self, _event=None):
+        if not self._hover_enabled:
+            return
         self._apply_visual(active=True)
 
     def _leave(self, _event=None):
@@ -193,6 +202,8 @@ class ColorButton(tk.Label):
         self._apply_visual(active=False)
 
     def _press(self, _event=None):
+        if not self._hover_enabled:
+            return
         if self._enabled:
             self.focus_set()
             self._pressed = True
@@ -204,6 +215,8 @@ class ColorButton(tk.Label):
         was_pressed = self._pressed
         self._pressed = False
         self._apply_visual(active=False)
+        if not self._hover_enabled:
+            return
         if not was_pressed or not self._command:
             return
         if event is not None:
@@ -213,6 +226,8 @@ class ColorButton(tk.Label):
         self._command()
 
     def _focus_in(self, _event=None):
+        if not self._hover_enabled:
+            return
         self._apply_visual(focused=True)
 
     def _focus_out(self, _event=None):

@@ -56,6 +56,8 @@ class ViewerGUI(tk.Tk):
         self.audio_manager = AudioManager()
         self.current_scene_sound = None
         self.current_scene_sound_loop = False
+        self._last_canvas_size = None
+        self._last_panel_size = None
 
         self.load_assets()
         self.create_widgets()
@@ -257,18 +259,21 @@ class ViewerGUI(tk.Tk):
 
     def draw_gradient(self, event):
         """Vẽ nền gradient cho canvas."""
-        self.canvas.delete("gradient")
         width, height = event.width, event.height
         if width <= 0 or height <= 0: return
 
-        self.gradient_image = render_background(
-            self.background_source,
-            (width, height),
-            GRADIENT_START,
-            GRADIENT_END,
-        )
-        self.canvas.create_image(0, 0, image=self.gradient_image, anchor="nw", tags="gradient")
-        self.canvas.tag_lower("gradient")
+        size = (width, height)
+        if self._last_canvas_size != size:
+            self.canvas.delete("gradient")
+            self.gradient_image = render_background(
+                self.background_source,
+                size,
+                GRADIENT_START,
+                GRADIENT_END,
+            )
+            self.canvas.create_image(0, 0, image=self.gradient_image, anchor="nw", tags="gradient")
+            self.canvas.tag_lower("gradient")
+            self._last_canvas_size = size
         self.update_panel_backgrounds(width, height)
 
     def update_panel_backgrounds(self, width, height):
@@ -278,6 +283,10 @@ class ViewerGUI(tk.Tk):
         main_width = max(1, int(width * 0.75))
         prize_width = max(1, width - main_width)
         game_height = max(1, int(height * 0.74))
+        panel_size = (main_width, prize_width, height, game_height)
+        if self._last_panel_size == panel_size:
+            return
+        self._last_panel_size = panel_size
 
         self.main_background_image = render_background(
             self.background_source,
