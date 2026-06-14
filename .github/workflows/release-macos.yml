@@ -40,7 +40,7 @@ jobs:
   build:
     name: macOS ${{ matrix.arch }} pkg
     needs: init-release
-    if: always()
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || needs.init-release.result == 'success') }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -91,6 +91,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          mapfile -t pkgs < <(find release -type f -name "*.pkg")
-          printf '%s\n' "${pkgs[@]}"
-          gh release upload "${GITHUB_REF_NAME}" "${pkgs[@]}" --clobber
+          found=0
+          for pkg in release/*.pkg; do
+            if [ ! -f "$pkg" ]; then
+              continue
+            fi
+            found=1
+            ls -lh "$pkg"
+            gh release upload "${GITHUB_REF_NAME}" "$pkg" --clobber
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "No macOS pkg files found in release/."
+            exit 1
+          fi

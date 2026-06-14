@@ -63,11 +63,20 @@ jobs:
             throw "No Windows release zip found."
           }
 
+          $ReleaseExists = $true
           gh release view $Tag *> $null
           if ($LASTEXITCODE -ne 0) {
+            $ReleaseExists = $false
+          }
+
+          if (-not $ReleaseExists) {
             gh release create $Tag $Zip.FullName `
               --title "Ai La Trieu Phu Windows $Tag" `
               --notes "Windows unsigned desktop build. This release includes the branded app icon."
           } else {
             gh release upload $Tag $Zip.FullName --clobber
+          }
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub release publish failed."
           }
