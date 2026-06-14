@@ -110,8 +110,8 @@ Cây tiền thưởng hiện dùng format mới:
 
 Luật tiền thưởng:
 
-- Trả lời sai trước câu 10: nhận số tiền đã trả lời đúng trước đó.
-- Trả lời sai từ câu 10 trở đi: nhận `5.000.000 VNĐ`.
+- Trả lời sai từ câu 1 đến câu 5: nhận `0 VNĐ`.
+- Trả lời sai từ câu 6 trở đi: nhận `2.000.000 VNĐ`.
 - Give up từ câu 6 trở đi: nhận số tiền đã trả lời đúng trước đó.
 - Đúng cả 15 câu: nhận `500.000.000 VNĐ`.
 
@@ -258,15 +258,15 @@ Quy ước version:
 Tạo release Windows:
 
 ```bash
-git tag windows_v1.1.3
-git push origin windows_v1.1.3
+git tag windows_v1.1.4
+git push origin windows_v1.1.4
 ```
 
 Tạo release macOS:
 
 ```bash
-git tag macos_v1.1.3
-git push origin macos_v1.1.3
+git tag macos_v1.1.4
+git push origin macos_v1.1.4
 ```
 
 Workflow sẽ upload:

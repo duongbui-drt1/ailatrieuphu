@@ -7,6 +7,8 @@ param(
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $RepoRoot
+$env:PYTHONUTF8 = "1"
+$env:PYTHONIOENCODING = "utf-8"
 
 $TempBuildRoot = Join-Path ([System.IO.Path]::GetTempPath()) "ailatrieuphu-pyinstaller"
 $TempDist = Join-Path $TempBuildRoot "dist"
@@ -38,9 +40,10 @@ function Resolve-Python {
         $Candidates += @{ Command = $CodexPython; Args = @() }
     }
 
-    $Candidates += @{ Command = "py"; Args = @("-3") }
     $Candidates += @{ Command = "python"; Args = @() }
     $Candidates += @{ Command = "python3"; Args = @() }
+    $Candidates += @{ Command = "py"; Args = @("-3.12") }
+    $Candidates += @{ Command = "py"; Args = @("-3") }
 
     foreach ($Candidate in $Candidates) {
         $Command = Get-Command $Candidate.Command -ErrorAction SilentlyContinue

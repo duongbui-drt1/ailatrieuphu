@@ -24,7 +24,7 @@ PRIZE_LEVELS = [
 READY_REQUIRED_FROM_LEVEL = 6
 LOSS_GUARANTEE_FROM_LEVEL_6 = "5.000.000"
 LOSS_GUARANTEE_FROM_LEVEL_11 = "22.000.000"
-LOSS_PRIZE_FROM_LEVEL_10 = "5.000.000"
+LOSS_PRIZE_AFTER_LEVEL_5 = "2.000.000"
 
 # --- BIẾN TOÀN CỤC ---
 player_conn = None
@@ -553,9 +553,9 @@ def needs_ready_confirmation(level):
     return level >= READY_REQUIRED_FROM_LEVEL
 
 def final_prize_on_wrong(level, current_prize):
-    if level >= 10:
-        return LOSS_PRIZE_FROM_LEVEL_10
-    return current_prize or "0"
+    if level > 5:
+        return LOSS_PRIZE_AFTER_LEVEL_5
+    return "0"
 
 def final_prize_on_give_up(current_prize):
     return current_prize or "0"
