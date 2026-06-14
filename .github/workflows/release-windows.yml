@@ -118,11 +118,38 @@ jobs:
               --notes "Windows unsigned desktop installer and role-specific downloads."
           }
 
-          foreach ($Zip in $Zips) {
+          $RoleZipNames = @(
+            "AiLaTrieuPhu-Windows-host-$Tag.zip",
+            "AiLaTrieuPhu-Windows-client-$Tag.zip",
+            "AiLaTrieuPhu-Windows-viewer-$Tag.zip"
+          )
+          $InstallerZipName = "AiLaTrieuPhu-Windows-Installer-$Tag.zip"
+
+          foreach ($Name in $RoleZipNames + @($InstallerZipName)) {
+            if (-not (Test-Path (Join-Path release $Name))) {
+              throw "Expected release asset was not created: $Name"
+            }
+          }
+
+          foreach ($Name in $RoleZipNames) {
+            $Zip = Get-Item (Join-Path release $Name)
             gh release upload $Tag $Zip.FullName --clobber
             if ($LASTEXITCODE -ne 0) {
               throw "GitHub release upload failed for $($Zip.Name)."
             }
+          }
+
+          $ReleaseInfo = gh release view $Tag --json assets | ConvertFrom-Json
+          $UploadedNames = @($ReleaseInfo.assets | ForEach-Object { $_.name })
+          $MissingRoleAssets = @($RoleZipNames | Where-Object { $UploadedNames -notcontains $_ })
+          if ($MissingRoleAssets.Count -gt 0) {
+            throw "Role assets missing after upload: $($MissingRoleAssets -join ', ')"
+          }
+
+          $InstallerZip = Get-Item (Join-Path release $InstallerZipName)
+          gh release upload $Tag $InstallerZip.FullName --clobber
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub release upload failed for $($InstallerZip.Name)."
           }
 
           if ($LASTEXITCODE -ne 0) {

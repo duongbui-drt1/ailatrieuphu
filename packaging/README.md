@@ -88,22 +88,22 @@ Push an OS-specific tag. Each workflow builds only one operating system and uplo
 For a Windows release:
 
 ```bash
-git tag windows_v1.1.5
-git push origin windows_v1.1.5
+git tag windows_v1.1.6
+git push origin windows_v1.1.6
 ```
 
 The Windows workflow uploads:
 
-- `AiLaTrieuPhu-Windows-Installer-windows_v1.1.5.zip`
-- `AiLaTrieuPhu-Windows-host-windows_v1.1.5.zip`
-- `AiLaTrieuPhu-Windows-client-windows_v1.1.5.zip`
-- `AiLaTrieuPhu-Windows-viewer-windows_v1.1.5.zip`
+- `AiLaTrieuPhu-Windows-Installer-windows_v1.1.6.zip`
+- `AiLaTrieuPhu-Windows-host-windows_v1.1.6.zip`
+- `AiLaTrieuPhu-Windows-client-windows_v1.1.6.zip`
+- `AiLaTrieuPhu-Windows-viewer-windows_v1.1.6.zip`
 
 For a macOS release:
 
 ```bash
-git tag macos_v1.1.5
-git push origin macos_v1.1.5
+git tag macos_v1.1.6
+git push origin macos_v1.1.6
 ```
 
 The macOS-only workflow uploads role-specific `.pkg` files and a small installer selector. Users can download the installer selector, choose Host/Người Chơi/Khán Giả, and fetch only the needed package.

@@ -19,21 +19,21 @@ $Roles = @{
     "1" = @{
         Key = "host"
         Display = "Ai Là Triệu Phú (Host)"
-        Asset = "AiLaTrieuPhu-Windows-host-$Tag.zip"
+        Assets = @("AiLaTrieuPhu-Windows-host-$Tag.zip", "AiLaTrieuPhu-Windows-host.zip")
         Folder = "AiLaTrieuPhu-Host"
         Exe = "AiLaTrieuPhu-Host.exe"
     }
     "2" = @{
         Key = "client"
         Display = "Ai Là Triệu Phú (Người Chơi)"
-        Asset = "AiLaTrieuPhu-Windows-client-$Tag.zip"
+        Assets = @("AiLaTrieuPhu-Windows-client-$Tag.zip", "AiLaTrieuPhu-Windows-client.zip")
         Folder = "AiLaTrieuPhu-Client"
         Exe = "AiLaTrieuPhu-Client.exe"
     }
     "3" = @{
         Key = "viewer"
         Display = "Ai Là Triệu Phú (Khán Giả)"
-        Asset = "AiLaTrieuPhu-Windows-viewer-$Tag.zip"
+        Assets = @("AiLaTrieuPhu-Windows-viewer-$Tag.zip", "AiLaTrieuPhu-Windows-viewer.zip")
         Folder = "AiLaTrieuPhu-Viewer"
         Exe = "AiLaTrieuPhu-Viewer.exe"
     }
@@ -54,23 +54,43 @@ if (-not $Roles.ContainsKey($Choice)) {
 }
 
 $Role = $Roles[$Choice]
-$Url = "https://github.com/$Repo/releases/download/$Tag/$($Role.Asset)"
-$TempZip = Join-Path $env:TEMP $Role.Asset
+$TempZip = Join-Path $env:TEMP "$($Role.Folder)-$Tag.zip"
 $TargetDir = Join-Path $InstallDir $Role.Display
 $ExtractRoot = Join-Path $env:TEMP "$($Role.Folder)-extract"
 $ExtractedDir = Join-Path $ExtractRoot $Role.Folder
 
 Write-Host ""
 Write-Host "Đang tải $($Role.Display)..." -ForegroundColor Cyan
-Write-Host $Url
+$Downloaded = $false
+$LastDownloadError = $null
 try {
-    Invoke-WebRequest -Uri $Url -OutFile $TempZip -UseBasicParsing
-} catch {
+    foreach ($Asset in $Role.Assets) {
+        $Url = "https://github.com/$Repo/releases/download/$Tag/$Asset"
+        Write-Host $Url
+        try {
+            Invoke-WebRequest -Uri $Url -OutFile $TempZip -UseBasicParsing
+            $Downloaded = $true
+            break
+        } catch {
+            $LastDownloadError = $_
+        }
+    }
+} finally {
+    if (-not $Downloaded -and (Test-Path $TempZip)) {
+        Remove-Item -LiteralPath $TempZip -Force -ErrorAction SilentlyContinue
+    }
+}
+
+if (-not $Downloaded) {
     Write-Host ""
-    Write-Host "Không tải được gói cài đặt: $($Role.Asset)" -ForegroundColor Red
-    Write-Host "Nếu release vừa được tạo, hãy chờ GitHub Actions upload xong toàn bộ asset rồi chạy lại installer."
+    Write-Host "Không tải được gói cài đặt cho $($Role.Display)." -ForegroundColor Red
+    Write-Host "Release này đang thiếu một trong các asset sau:"
+    foreach ($Asset in $Role.Assets) {
+        Write-Host "  - $Asset"
+    }
+    Write-Host "Hãy chờ GitHub Actions chạy xong hoặc tải release mới hơn."
     Write-Host "Release: https://github.com/$Repo/releases/tag/$Tag"
-    throw
+    throw $LastDownloadError
 }
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
