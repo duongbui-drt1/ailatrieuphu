@@ -22,6 +22,7 @@ $Roles = @{
         Assets = @("AiLaTrieuPhu-Windows-host-$Tag.zip", "AiLaTrieuPhu-Windows-host.zip")
         Folder = "AiLaTrieuPhu-Host"
         Exe = "AiLaTrieuPhu-Host.exe"
+        ShortcutName = "Ai La Trieu Phu (Host)"
     }
     "2" = @{
         Key = "client"
@@ -29,6 +30,7 @@ $Roles = @{
         Assets = @("AiLaTrieuPhu-Windows-client-$Tag.zip", "AiLaTrieuPhu-Windows-client.zip")
         Folder = "AiLaTrieuPhu-Client"
         Exe = "AiLaTrieuPhu-Client.exe"
+        ShortcutName = "Ai La Trieu Phu (Nguoi Choi)"
     }
     "3" = @{
         Key = "viewer"
@@ -36,6 +38,7 @@ $Roles = @{
         Assets = @("AiLaTrieuPhu-Windows-viewer-$Tag.zip", "AiLaTrieuPhu-Windows-viewer.zip")
         Folder = "AiLaTrieuPhu-Viewer"
         Exe = "AiLaTrieuPhu-Viewer.exe"
+        ShortcutName = "Ai La Trieu Phu (Khan Gia)"
     }
 }
 
@@ -119,7 +122,11 @@ if (-not $Exe) {
 }
 
 $Desktop = [Environment]::GetFolderPath("Desktop")
-$ShortcutPath = Join-Path $Desktop "$($Role.Display).lnk"
+$ShortcutPath = Join-Path $Desktop "$($Role.ShortcutName).lnk"
+$LegacyShortcutPath = Join-Path $Desktop "$($Role.Display).lnk"
+if (Test-Path $LegacyShortcutPath) {
+    Remove-Item -LiteralPath $LegacyShortcutPath -Force -ErrorAction SilentlyContinue
+}
 $Shell = New-Object -ComObject WScript.Shell
 $Shortcut = $Shell.CreateShortcut($ShortcutPath)
 $Shortcut.TargetPath = [string]$Exe.FullName

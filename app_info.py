@@ -1,5 +1,5 @@
 APP_NAME = "Ai La Trieu Phu"
-APP_VERSION = "1.1.7"
+APP_VERSION = "1.1.8"
 APP_AUTHOR = "Duli Production LLC."
 APP_COPYRIGHT = "Copyright (c) 2020-2026 Duli Production LLC. All rights reserved."
 APP_DESCRIPTION = "Ai La Trieu Phu desktop game show control suite"
