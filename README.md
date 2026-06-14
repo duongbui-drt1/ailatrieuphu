@@ -110,9 +110,9 @@ Cây tiền thưởng hiện dùng format mới:
 
 Luật tiền thưởng:
 
-- Sai trước câu 6: nhận `0 VNĐ`.
-- Sai từ câu 6 đến 10: nhận `5.000.000 VNĐ`.
-- Sai từ câu 11 đến 15: nhận `22.000.000 VNĐ`.
+- Trả lời sai trước câu 10: nhận số tiền đã trả lời đúng trước đó.
+- Trả lời sai từ câu 10 trở đi: nhận `5.000.000 VNĐ`.
+- Give up từ câu 6 trở đi: nhận số tiền đã trả lời đúng trước đó.
 - Đúng cả 15 câu: nhận `500.000.000 VNĐ`.
 
 ## Trợ Giúp
