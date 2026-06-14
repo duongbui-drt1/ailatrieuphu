@@ -21,8 +21,26 @@ on:
       - "macos_v*"
 
 jobs:
+  init-release:
+    name: Prepare macOS GitHub Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/macos_v')
+    steps:
+      - name: Create release shell
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
+            gh release create "${GITHUB_REF_NAME}" \
+              --title "Ai La Trieu Phu macOS ${GITHUB_REF_NAME}" \
+              --notes "macOS 14 unsigned pkg builds for Apple Silicon (arm64) and Intel. Right-click and Open may be required on first launch."
+
   build:
     name: macOS ${{ matrix.arch }} pkg
+    needs: init-release
+    if: always()
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -66,36 +84,13 @@ jobs:
           done
           ls -lh release
 
-      - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: AiLaTrieuPhu-macOS-${{ matrix.arch }}-pkg
-          path: release/*.pkg
-
-  release:
-    name: macOS GitHub Release
-    runs-on: ubuntu-latest
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/macos_v')
-    steps:
-      - name: Download macOS artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: release-assets
-
-      - name: List release files
-        shell: bash
-        run: |
-          find release-assets -maxdepth 3 -type f -print -exec ls -lh {} \;
-
-      - name: Create macOS GitHub release
+      - name: Publish macOS pkg to release
+        if: startsWith(github.ref, 'refs/tags/macos_v')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          mapfile -t pkgs < <(find release-assets -type f -name "*.pkg")
+          mapfile -t pkgs < <(find release -type f -name "*.pkg")
           printf '%s\n' "${pkgs[@]}"
-          gh release create "${GITHUB_REF_NAME}" "${pkgs[@]}" \
-            --title "Ai La Trieu Phu macOS ${GITHUB_REF_NAME}" \
-            --notes "macOS 14 unsigned pkg builds for Apple Silicon (arm64) and Intel. Right-click and Open may be required on first launch."
+          gh release upload "${GITHUB_REF_NAME}" "${pkgs[@]}" --clobber
