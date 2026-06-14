@@ -258,15 +258,15 @@ Quy ước version:
 Tạo release Windows:
 
 ```bash
-git tag windows_v1.1.8
-git push origin windows_v1.1.8
+git tag windows_v1.1.9
+git push origin windows_v1.1.9
 ```
 
 Tạo release macOS:
 
 ```bash
-git tag macos_v1.1.8
-git push origin macos_v1.1.8
+git tag macos_v1.1.9
+git push origin macos_v1.1.9
 ```
 
 Workflow sẽ upload:

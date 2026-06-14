@@ -121,6 +121,11 @@ if (-not $Exe) {
     throw "Không tìm thấy file chạy: $($Role.Exe)"
 }
 
+try {
+    Get-ChildItem -LiteralPath $TargetDir -Recurse -File | Unblock-File -ErrorAction SilentlyContinue
+} catch {
+}
+
 $Desktop = [Environment]::GetFolderPath("Desktop")
 $ShortcutPath = Join-Path $Desktop "$($Role.ShortcutName).lnk"
 $LegacyShortcutPath = Join-Path $Desktop "$($Role.Display).lnk"
@@ -140,7 +145,7 @@ Write-Host "Thư mục cài đặt: $TargetDir"
 Write-Host "Shortcut: $ShortcutPath"
 Remove-Item -LiteralPath $ExtractRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host ""
-$OpenNow = Read-Host "Mở app ngay bây giờ? (Y/N)"
+$OpenNow = Read-Host "Mở app ngay bây giờ bằng quyền Administrator? (Y/N)"
 if ($OpenNow -match "^[Yy]") {
-    Start-Process -FilePath $Exe.FullName -WorkingDirectory $Exe.DirectoryName
+    Start-Process -FilePath $Exe.FullName -WorkingDirectory $Exe.DirectoryName -Verb RunAs
 }
