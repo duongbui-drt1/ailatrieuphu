@@ -975,8 +975,10 @@ class ViewerGUI(tk.Tk):
             if btn.winfo_ismapped():
                 if key == correct_answer:
                     self.style_answer_button(key, "correct")
+                elif key == player_answer:
+                    self.style_answer_button(key, "selected")
                 else:
-                    self.style_answer_button(key, "wrong" if key == player_answer else "dim")
+                    self.style_answer_button(key, "wrong")
 
         status = "đúng" if data.get('correct') else "sai"
         prefix = "Đáp án tiếc nuối" if data.get('give_up_regret') else "Công bố: thí sinh trả lời"

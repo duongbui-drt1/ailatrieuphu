@@ -671,28 +671,41 @@ class HostGUI(tk.Tk):
             padx=10,
             pady=8,
         ).grid(row=0, column=0, sticky="ew")
-        self.pack_detail = tk.Label(
+        self.pack_detail = scrolledtext.ScrolledText(
             detail_frame,
-            text="Chưa chọn pack.",
             bg="#061120",
             fg=HOST_TEXT,
             font=("Segoe UI", 10),
-            justify=tk.LEFT,
-            anchor="nw",
-            wraplength=420,
+            wrap=tk.WORD,
+            relief=tk.FLAT,
+            bd=0,
             padx=12,
             pady=10,
+            insertbackground=HOST_TEXT,
+            state=tk.DISABLED,
         )
         self.pack_detail.grid(row=1, column=0, sticky="nsew")
+        self.set_pack_detail_text("Chưa chọn pack.")
 
         self.pack_records = []
         self.refresh_pack_list()
 
+    def set_pack_detail_text(self, text):
+        if not hasattr(self, "pack_detail"):
+            return
+        if isinstance(self.pack_detail, tk.Text):
+            self.pack_detail.config(state=tk.NORMAL)
+            self.pack_detail.delete("1.0", tk.END)
+            self.pack_detail.insert("1.0", text)
+            self.pack_detail.config(state=tk.DISABLED)
+            self.pack_detail.yview_moveto(0)
+        else:
+            self.pack_detail.config(text=text)
+
     def update_pack_detail(self):
         record = self.selected_pack_record()
         if not record:
-            if hasattr(self, "pack_detail"):
-                self.pack_detail.config(text="Chưa chọn pack.")
+            self.set_pack_detail_text("Chưa chọn pack.")
             if hasattr(self, "pack_summary_label"):
                 self.pack_summary_label.config(text=f"{len(getattr(self, 'pack_records', []))} pack")
             self.update_pack_action_state()
@@ -715,7 +728,7 @@ class HostGUI(tk.Tk):
             f"Tồn tại file: {'Có' if record.get('exists') else 'Không'}\n"
             f"File: {record.get('path')}"
         )
-        self.pack_detail.config(text=detail)
+        self.set_pack_detail_text(detail)
         self.update_pack_action_state()
 
     def format_pack_row(self, record):
@@ -756,19 +769,15 @@ class HostGUI(tk.Tk):
             return
         preview = server_logic.preview_question_pack_from_host(record["id"])
         if not preview:
-            if hasattr(self, "pack_detail"):
-                self.pack_detail.config(text="Không đọc được pack này hoặc file pack không còn tồn tại.")
+            self.set_pack_detail_text("Không đọc được pack này hoặc file pack không còn tồn tại.")
             self.update_pack_action_state()
             return
         questions = preview.get("questions", [])
         lines = [f"{preview.get('name')} - {len(questions)} câu", ""]
-        for question in questions[:8]:
+        for question in questions:
             lines.append(f"Câu {question.get('level')}: {question.get('question')}")
             lines.append(f"  Đáp án đúng: {question.get('answer')}")
-        if len(questions) > 8:
-            lines.append("")
-            lines.append(f"... còn {len(questions) - 8} câu.")
-        self.pack_detail.config(text="\n".join(lines))
+        self.set_pack_detail_text("\n".join(lines))
         self.update_pack_action_state()
 
     def bind_question_scroll(self, widget):

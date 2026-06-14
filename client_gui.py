@@ -526,12 +526,15 @@ class GameClientGUI(tk.Toplevel):
         self.audio_manager.stop_all()
 
         # Show correct/wrong answers
+        player_answer = data.get('player_answer')
         for key, btn in self.option_buttons.items():
             if btn.winfo_ismapped():
                 if key == correct_answer:
                     btn.config(image=self.btn_images['correct'])
+                elif key == player_answer:
+                    btn.config(image=self.btn_images['selected'])
                 else:
-                    btn.config(image=self.btn_images['wrong'])
+                    btn.config(image=self.btn_images['normal'])
         self.force_repaint()
 
         if data.get('give_up_regret'):

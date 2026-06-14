@@ -35,15 +35,15 @@ APP_ICON_SOURCE = ROOT_DIR / "images" / "logo.png"
 APPS = {
     "host": {
         "entry": "run_host.pyw",
-        "name": "AiLaTrieuPhu-Host",
+        "name": "Ai Là Triệu Phú (Host)",
     },
     "client": {
         "entry": "run_client.pyw",
-        "name": "AiLaTrieuPhu-Client",
+        "name": "Ai Là Triệu Phú (Người Chơi)",
     },
     "viewer": {
         "entry": "run_viewer.pyw",
-        "name": "AiLaTrieuPhu-Viewer",
+        "name": "Ai Là Triệu Phú (Khán Giả)",
     },
 }
 

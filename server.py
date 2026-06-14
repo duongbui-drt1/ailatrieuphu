@@ -557,10 +557,8 @@ def final_prize_on_wrong(level, current_prize):
         return LOSS_PRIZE_FROM_LEVEL_10
     return current_prize or "0"
 
-def final_prize_on_give_up(level):
-    if 1 <= level <= len(PRIZE_LEVELS):
-        return PRIZE_LEVELS[level - 1]
-    return "0"
+def final_prize_on_give_up(current_prize):
+    return current_prize or "0"
 
 def broadcast_lifeline_error(lifeline_type, message):
     payload = {
@@ -735,7 +733,7 @@ def handle_client(conn, addr, player_info):
             nonlocal give_up_mode, give_up_result_revealed, give_up_final_prize
             give_up_mode = True
             give_up_result_revealed = False
-            give_up_final_prize = final_prize_on_give_up(level)
+            give_up_final_prize = final_prize_on_give_up(game_state.get('prize'))
             host_give_up_event.clear()
             host_regret_reveal_event.clear()
             host_finish_give_up_event.clear()

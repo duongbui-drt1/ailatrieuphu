@@ -35,7 +35,7 @@ jobs:
           gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
             gh release create "${GITHUB_REF_NAME}" \
               --title "Ai La Trieu Phu macOS ${GITHUB_REF_NAME}" \
-              --notes "macOS 14 unsigned pkg builds for Apple Silicon (arm64) and Intel. Right-click and Open may be required on first launch."
+              --notes "macOS 14 unsigned installer selector and role-specific pkg builds for Apple Silicon (arm64) and Intel. Right-click and Open may be required on first launch."
 
   build:
     name: macOS ${{ matrix.arch }} pkg
@@ -73,18 +73,71 @@ jobs:
           if [ "$VERSION" = "$GITHUB_REF_NAME" ]; then VERSION="1.0.0"; fi
           bash packaging/build_macos.sh "$TARGET" "$VERSION"
 
-      - name: Keep and label pkg files only
+      - name: Pack macOS role pkgs and installer
         shell: bash
         run: |
           mkdir -p release
-          find dist -maxdepth 1 -type d -name "*.app" -exec rm -rf {} +
-          for pkg in dist/*.pkg; do
-            base="$(basename "$pkg" .pkg)"
-            cp "$pkg" "release/${base}-${{ matrix.arch }}-macos14.pkg"
-          done
-          ls -lh release
+          rm -f dist/*.pkg
+          VERSION="${GITHUB_REF_NAME#macos_v}"
+          if [ "$VERSION" = "$GITHUB_REF_NAME" ]; then VERSION="1.0.0"; fi
 
-      - name: Publish macOS pkg to release
+          TARGET="${{ github.event.inputs.target }}"
+          if [ -z "$TARGET" ]; then TARGET="all"; fi
+
+          pack_role() {
+            role="$1"
+            display="$2"
+            if [ "$TARGET" != "all" ] && [ "$TARGET" != "$role" ]; then
+              return 0
+            fi
+
+            app="dist/${display}.app"
+            if [ ! -d "$app" ]; then
+              echo "Missing macOS app bundle: $app"
+              return 0
+            fi
+
+            pkgroot="$(mktemp -d)"
+            mkdir -p "$pkgroot/Applications"
+            cp -R "$app" "$pkgroot/Applications/"
+            pkg="release/AiLaTrieuPhu-macOS-${role}-${{ matrix.arch }}-macos14.pkg"
+            pkgbuild \
+              --root "$pkgroot" \
+              --identifier "vn.duli.ailatrieuphu.${role}" \
+              --version "$VERSION" \
+              --install-location "/" \
+              "$pkg"
+            rm -rf "$pkgroot"
+          }
+
+          pack_role "host" "Ai Là Triệu Phú (Host)"
+          pack_role "client" "Ai Là Triệu Phú (Người Chơi)"
+          pack_role "viewer" "Ai Là Triệu Phú (Khán Giả)"
+
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            installer_dir="release/installer-macos"
+            mkdir -p "$installer_dir"
+            sed \
+              -e "s#__REPO__#${{ github.repository }}#g" \
+              -e "s#__TAG__#${GITHUB_REF_NAME}#g" \
+              packaging/installers/macos/Install-AiLaTrieuPhu.command.in > "$installer_dir/Install-AiLaTrieuPhu.command"
+            chmod +x "$installer_dir/Install-AiLaTrieuPhu.command"
+            (cd "$installer_dir" && zip -r "../AiLaTrieuPhu-macOS-Installer-${GITHUB_REF_NAME}.zip" .)
+          fi
+
+          found=0
+          for item in release/*; do
+            if [ -f "$item" ]; then
+              found=1
+              ls -lh "$item"
+            fi
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "No release files were created."
+            exit 1
+          fi
+
+      - name: Publish macOS files to release
         if: startsWith(github.ref, 'refs/tags/macos_v')
         shell: bash
         env:
@@ -92,15 +145,15 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           found=0
-          for pkg in release/*.pkg; do
-            if [ ! -f "$pkg" ]; then
+          for asset in release/*; do
+            if [ ! -f "$asset" ]; then
               continue
             fi
             found=1
-            ls -lh "$pkg"
-            gh release upload "${GITHUB_REF_NAME}" "$pkg" --clobber
+            ls -lh "$asset"
+            gh release upload "${GITHUB_REF_NAME}" "$asset" --clobber
           done
           if [ "$found" -eq 0 ]; then
-            echo "No macOS pkg files found in release/."
+            echo "No macOS release files found in release/."
             exit 1
           fi

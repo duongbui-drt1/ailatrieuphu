@@ -1,0 +1,83 @@
+param(
+    [string]$InstallDir = "$env:LOCALAPPDATA\Programs\Ai La Trieu Phu"
+)
+
+$ErrorActionPreference = "Stop"
+$Repo = "__REPO__"
+$Tag = "__TAG__"
+
+$Roles = @{
+    "1" = @{
+        Key = "host"
+        Display = "Ai Là Triệu Phú (Host)"
+        Asset = "AiLaTrieuPhu-Windows-host-$Tag.zip"
+        Exe = "Ai Là Triệu Phú (Host).exe"
+    }
+    "2" = @{
+        Key = "client"
+        Display = "Ai Là Triệu Phú (Người Chơi)"
+        Asset = "AiLaTrieuPhu-Windows-client-$Tag.zip"
+        Exe = "Ai Là Triệu Phú (Người Chơi).exe"
+    }
+    "3" = @{
+        Key = "viewer"
+        Display = "Ai Là Triệu Phú (Khán Giả)"
+        Asset = "AiLaTrieuPhu-Windows-viewer-$Tag.zip"
+        Exe = "Ai Là Triệu Phú (Khán Giả).exe"
+    }
+}
+
+Write-Host ""
+Write-Host "Ai Là Triệu Phú - Windows Installer" -ForegroundColor Cyan
+Write-Host "Release: $Tag"
+Write-Host ""
+Write-Host "1. Host"
+Write-Host "2. Người Chơi"
+Write-Host "3. Khán Giả"
+Write-Host ""
+
+$Choice = Read-Host "Chọn phiên bản cần cài (1/2/3)"
+if (-not $Roles.ContainsKey($Choice)) {
+    throw "Lựa chọn không hợp lệ."
+}
+
+$Role = $Roles[$Choice]
+$Url = "https://github.com/$Repo/releases/download/$Tag/$($Role.Asset)"
+$TempZip = Join-Path $env:TEMP $Role.Asset
+$TargetDir = Join-Path $InstallDir $Role.Display
+
+Write-Host ""
+Write-Host "Đang tải $($Role.Display)..." -ForegroundColor Cyan
+Write-Host $Url
+Invoke-WebRequest -Uri $Url -OutFile $TempZip
+
+New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+if (Test-Path $TargetDir) {
+    Remove-Item -LiteralPath $TargetDir -Recurse -Force
+}
+
+Write-Host "Đang giải nén vào $InstallDir..."
+Expand-Archive -Path $TempZip -DestinationPath $InstallDir -Force
+
+$Exe = Get-ChildItem -LiteralPath $InstallDir -Recurse -Filter $Role.Exe | Select-Object -First 1
+if (-not $Exe) {
+    throw "Không tìm thấy file chạy: $($Role.Exe)"
+}
+
+$Desktop = [Environment]::GetFolderPath("Desktop")
+$ShortcutPath = Join-Path $Desktop "$($Role.Display).lnk"
+$Shell = New-Object -ComObject WScript.Shell
+$Shortcut = $Shell.CreateShortcut($ShortcutPath)
+$Shortcut.TargetPath = $Exe.FullName
+$Shortcut.WorkingDirectory = $Exe.DirectoryName
+$Shortcut.IconLocation = $Exe.FullName
+$Shortcut.Save()
+
+Write-Host ""
+Write-Host "Đã cài: $($Role.Display)" -ForegroundColor Green
+Write-Host "Shortcut: $ShortcutPath"
+Write-Host ""
+$OpenNow = Read-Host "Mở app ngay bây giờ? (Y/N)"
+if ($OpenNow -match "^[Yy]") {
+    Start-Process -FilePath $Exe.FullName -WorkingDirectory $Exe.DirectoryName
+}

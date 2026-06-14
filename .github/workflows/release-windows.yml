@@ -40,14 +40,45 @@ jobs:
           if (-not $Target) { $Target = "all" }
           .\packaging\build_windows.ps1 -Target $Target
 
-      - name: Pack Windows release zip
+      - name: Pack Windows role zips and installer
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release | Out-Null
           $Tag = "${{ github.ref_name }}"
           if (-not $Tag) { $Tag = "manual" }
-          $ZipPath = "release\AiLaTrieuPhu-Windows-$Tag.zip"
-          Compress-Archive -Path "dist\*" -DestinationPath $ZipPath -Force
+
+          $Target = "${{ github.event.inputs.target }}"
+          if (-not $Target) { $Target = "all" }
+          $Roles = @(
+            @{ Key = "host"; Display = "Ai Là Triệu Phú (Host)" },
+            @{ Key = "client"; Display = "Ai Là Triệu Phú (Người Chơi)" },
+            @{ Key = "viewer"; Display = "Ai Là Triệu Phú (Khán Giả)" }
+          )
+
+          foreach ($Role in $Roles) {
+            if ($Target -ne "all" -and $Target -ne $Role.Key) {
+              continue
+            }
+            $AppDir = Join-Path "dist" $Role.Display
+            $AppExe = Join-Path "dist" "$($Role.Display).exe"
+            $ZipPath = "release\AiLaTrieuPhu-Windows-$($Role.Key)-$Tag.zip"
+            if (Test-Path $AppDir) {
+              Compress-Archive -Path $AppDir -DestinationPath $ZipPath -Force
+            } elseif (Test-Path $AppExe) {
+              Compress-Archive -Path $AppExe -DestinationPath $ZipPath -Force
+            } else {
+              Write-Warning "Missing Windows app output for $($Role.Display)"
+            }
+          }
+
+          $InstallerDir = "release\installer-windows"
+          New-Item -ItemType Directory -Force -Path $InstallerDir | Out-Null
+          $Installer = Get-Content "packaging\installers\windows\Install-AiLaTrieuPhu.ps1.in" -Raw
+          $Installer = $Installer.Replace("__REPO__", "${{ github.repository }}").Replace("__TAG__", $Tag)
+          Set-Content -Path (Join-Path $InstallerDir "Install-AiLaTrieuPhu.ps1") -Value $Installer -Encoding UTF8
+          Copy-Item "packaging\installers\windows\Install-AiLaTrieuPhu.cmd" (Join-Path $InstallerDir "Install-AiLaTrieuPhu.cmd") -Force
+          Compress-Archive -Path "$InstallerDir\*" -DestinationPath "release\AiLaTrieuPhu-Windows-Installer-$Tag.zip" -Force
+
           Get-ChildItem release | Format-Table Name, Length
 
       - name: Publish Windows release
@@ -58,9 +89,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           $Tag = "${{ github.ref_name }}"
-          $Zip = Get-ChildItem release -Filter *.zip | Select-Object -First 1
-          if (-not $Zip) {
-            throw "No Windows release zip found."
+          $Zips = @(Get-ChildItem release -Filter *.zip)
+          if ($Zips.Count -eq 0) {
+            throw "No Windows release zip files found."
           }
 
           $ReleaseExists = $true
@@ -70,11 +101,16 @@ jobs:
           }
 
           if (-not $ReleaseExists) {
-            gh release create $Tag $Zip.FullName `
+            gh release create $Tag `
               --title "Ai La Trieu Phu Windows $Tag" `
-              --notes "Windows unsigned desktop build. This release includes the branded app icon."
-          } else {
+              --notes "Windows unsigned desktop installer and role-specific downloads."
+          }
+
+          foreach ($Zip in $Zips) {
             gh release upload $Tag $Zip.FullName --clobber
+            if ($LASTEXITCODE -ne 0) {
+              throw "GitHub release upload failed for $($Zip.Name)."
+            }
           }
 
           if ($LASTEXITCODE -ne 0) {

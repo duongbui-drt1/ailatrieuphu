@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO="__REPO__"
+TAG="__TAG__"
+
+ARCH="$(uname -m)"
+if [ "$ARCH" = "arm64" ]; then
+  RELEASE_ARCH="arm64"
+else
+  RELEASE_ARCH="intel"
+fi
+
+echo ""
+echo "Ai Là Triệu Phú - macOS Installer"
+echo "Release: $TAG"
+echo "Máy hiện tại: $RELEASE_ARCH"
+echo ""
+echo "1. Host"
+echo "2. Người Chơi"
+echo "3. Khán Giả"
+echo ""
+printf "Chọn phiên bản cần cài (1/2/3): "
+read -r CHOICE
+
+case "$CHOICE" in
+  1)
+    ROLE="host"
+    DISPLAY="Ai Là Triệu Phú (Host)"
+    ;;
+  2)
+    ROLE="client"
+    DISPLAY="Ai Là Triệu Phú (Người Chơi)"
+    ;;
+  3)
+    ROLE="viewer"
+    DISPLAY="Ai Là Triệu Phú (Khán Giả)"
+    ;;
+  *)
+    echo "Lựa chọn không hợp lệ."
+    exit 1
+    ;;
+esac
+
+ASSET="AiLaTrieuPhu-macOS-${ROLE}-${RELEASE_ARCH}-macos14.pkg"
+URL="https://github.com/${REPO}/releases/download/${TAG}/${ASSET}"
+TMP_PKG="${TMPDIR:-/tmp}/${ASSET}"
+
+echo ""
+echo "Đang tải ${DISPLAY}..."
+echo "$URL"
+curl -L --fail --progress-bar -o "$TMP_PKG" "$URL"
+
+echo ""
+echo "Đã tải: $TMP_PKG"
+echo "Đang mở macOS Installer..."
+open "$TMP_PKG"

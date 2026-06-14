@@ -2,9 +2,9 @@
 
 The project ships three desktop apps:
 
-- `AiLaTrieuPhu-Host`
-- `AiLaTrieuPhu-Client`
-- `AiLaTrieuPhu-Viewer`
+- `Ai Là Triệu Phú (Host)`
+- `Ai Là Triệu Phú (Người Chơi)`
+- `Ai Là Triệu Phú (Khán Giả)`
 
 The build scripts package `audio/`, `images/`, and every `questions_*.json` file into each app.
 
@@ -35,7 +35,7 @@ Build only one role:
 Default output is a stable one-folder app under `dist/`, for example:
 
 ```text
-dist/AiLaTrieuPhu-Host/AiLaTrieuPhu-Host.exe
+dist/Ai Là Triệu Phú (Host)/Ai Là Triệu Phú (Host).exe
 ```
 
 For a single-file executable:
@@ -111,7 +111,7 @@ git tag macos_v1.0.0
 git push origin macos_v1.0.0
 ```
 
-The macOS-only workflow uploads only `.pkg` files, not duplicated raw `.app` bundles, so the release is smaller and less confusing for end users.
+The macOS-only workflow uploads role-specific `.pkg` files and a small installer selector. Users can download the installer selector, choose Host/Người Chơi/Khán Giả, and fetch only the needed package.
 
 For a Windows-only release, push a Windows-specific tag:
 
@@ -120,7 +120,7 @@ git tag windows_v1.0.1
 git push origin windows_v1.0.1
 ```
 
-The Windows-only workflow uploads a single Windows zip and keeps it separate from macOS packages.
+The Windows-only workflow uploads role-specific zip files and a small installer selector. Users can download the installer selector, choose Host/Người Chơi/Khán Giả, and fetch only the needed app zip.
 
 The macOS-only workflow targets macOS 14. It builds two packages:
 
