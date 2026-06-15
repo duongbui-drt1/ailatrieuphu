@@ -113,9 +113,15 @@ jobs:
           }
 
           if (-not $ReleaseExists) {
-            gh release create $Tag `
-              --title "Ai La Trieu Phu Windows $Tag" `
-              --notes "Windows unsigned desktop installer and role-specific downloads."
+            $ReleaseArgs = @(
+              "release", "create", $Tag,
+              "--title", "Ai La Trieu Phu Windows $Tag",
+              "--notes", "Windows unsigned desktop installer and role-specific downloads."
+            )
+            if ($Tag -match "(?i)(alpha|beta|rc|pre)") {
+              $ReleaseArgs += "--prerelease"
+            }
+            gh @ReleaseArgs
           }
 
           $RoleZipNames = @(

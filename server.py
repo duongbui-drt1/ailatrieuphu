@@ -231,6 +231,19 @@ def show_game_scene_from_host():
     global current_viewer_scene_packet
     current_viewer_scene_packet = None
     if current_game_state_packet:
+        broadcast(current_game_state_packet)
+        with host_control_lock:
+            answer = pending_answer
+            level = pending_answer_level
+            is_regret = pending_answer_is_regret
+        if answer:
+            broadcast({
+                'type': 'answer_locked',
+                'player_answer': answer,
+                'level': level,
+                'requires_host_confirm': level >= 6,
+                'give_up_regret': is_regret,
+            })
         broadcast_to_viewers({'type': 'viewer_scene', 'scene': 'game', 'sound': 'viewer_game', 'sound_loop': False})
         return True
     set_viewer_scene('standby', 'AI LÀ TRIỆU PHÚ', 'Đang chờ thí sinh bắt đầu...')
@@ -252,6 +265,16 @@ def play_effect_from_host(name):
     broadcast({'type': 'play_effect', 'name': name})
     return True
 
+def start_lifeline_timer_from_host(lifeline_type, seconds=30):
+    sound_name = LIFELINE_TIMER_SOUNDS.get(lifeline_type, 'lifeline')
+    broadcast({
+        'type': 'lifeline_timer',
+        'lifeline': lifeline_type,
+        'seconds': seconds,
+        'sound': sound_name,
+    })
+    return True
+
 def poll_payload_from_session():
     if not current_poll_session:
         return {'questions': [], 'current_index': 0, 'announced': [], 'answers': {}, 'results': {}}
@@ -270,7 +293,13 @@ def poll_payload_from_session():
         'answers': {str(index): answer for index, answer in current_poll_session.get('answers', {}).items()},
         'results': {str(index): result for index, result in current_poll_session.get('results', {}).items()},
         'locked': sorted(current_poll_session.get('locked', set())),
-    }
+}
+
+LIFELINE_TIMER_SOUNDS = {
+    'audience': 'audience_countdown',
+    'call': 'lifeline_call',
+    'wise_man': 'wise_man_countdown',
+}
 
 def broadcast_interactive_poll(sound=None):
     payload = poll_payload_from_session()
@@ -837,6 +866,7 @@ def handle_client(conn, addr, player_info):
             host_give_up_requested = False
 
             needs_question_broadcast = True
+            question_reveal_lifeline = None
             locked_answer = None
             locked_answer_timestamp = time.time()
             clear_pending_answer()
@@ -850,7 +880,11 @@ def handle_client(conn, addr, player_info):
                         'prize': PRIZE_LEVELS[current_level],
                         'lifelines': game_state['lifelines'],
                     }
-                    broadcast(current_game_state_packet)
+                    packet_to_broadcast = current_game_state_packet.copy()
+                    if question_reveal_lifeline:
+                        packet_to_broadcast['lifeline_reveal'] = question_reveal_lifeline
+                        question_reveal_lifeline = None
+                    broadcast(packet_to_broadcast)
                     notify_host_question_panel()
                     if not session_pack_counted:
                         mark_active_question_pack_used()
@@ -983,12 +1017,15 @@ def handle_client(conn, addr, player_info):
                         if lifeline_type == '5050':
                             game_state['lifelines']['5050'] = False
                             current_q_options = handle_lifeline_5050(q_data)
+                            question_reveal_lifeline = '5050'
                             needs_question_broadcast = True
                         elif lifeline_type == 'audience':
                             game_state['lifelines']['audience'] = False
+                            broadcast({'type': 'lifeline_state', 'lifelines': game_state['lifelines']})
                             update_host_gui({'type': 'audience_request'})
                         elif lifeline_type == 'call':
                             game_state['lifelines']['call'] = False
+                            broadcast({'type': 'lifeline_state', 'lifelines': game_state['lifelines']})
                             update_host_gui({
                                 'type': 'call_request',
                                 'question': q_data['question'],
@@ -996,11 +1033,12 @@ def handle_client(conn, addr, player_info):
                             })
                         elif lifeline_type == 'wise_man':
                             game_state['lifelines']['wise_man'] = False
-                            wrong_answers = [key for key in q_data['options'] if key != q_data['answer']]
-                            suggested_answer = q_data['answer'] if random.random() < 0.5 else random.choice(wrong_answers)
-                            advice = f"Tổ tư vấn nghiêng về đáp án {suggested_answer}"
-                            broadcast({'type': 'lifeline_result', 'lifeline': 'wise_man', 'message': advice})
-                            update_host_gui({'type': 'log', 'message': f"Tổ tư vấn đã gợi ý đáp án {suggested_answer}."})
+                            broadcast({'type': 'lifeline_state', 'lifelines': game_state['lifelines']})
+                            update_host_gui({
+                                'type': 'wise_man_request',
+                                'question': q_data['question'],
+                                'answer': q_data['answer'],
+                            })
                     except Exception as lifeline_error:
                         message = f"LỖI trợ giúp {lifeline_type}: {lifeline_error}"
                         update_host_gui({'type': 'log', 'message': message})

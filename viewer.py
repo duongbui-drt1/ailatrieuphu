@@ -4,7 +4,8 @@ import threading
 import tkinter as tk
 from tkinter import simpledialog, messagebox
 try:
-    from ui_assets import apply_window_icon, load_background_source, load_button_images, load_logo_photo, load_lozenge_photo, render_background
+    from PIL import Image
+    from ui_assets import apply_window_icon, load_background_source, load_button_images, load_lifeline_icon, load_logo_photo, load_lozenge_photo, load_timer_photo, render_background, render_background_image
 except ImportError:
     messagebox.showerror("Thiếu thư viện", "Vui lòng cài đặt: pip install Pillow")
     exit()
@@ -22,7 +23,7 @@ PRIZE_LEVELS = [
 # Màu sắc (giống hệt client)
 GRADIENT_START = "#081d4f"
 GRADIENT_END = "#030712"
-WIDGET_BG = "#07143a"
+WIDGET_BG = "#050b18"
 PANEL_BG = "#0F254E"
 PANEL_BORDER = "#00D2FF"
 TEXT_MUTED = "#aebbe8"
@@ -50,6 +51,11 @@ class ViewerGUI(tk.Tk):
         self.current_level = 0
         self.scene_countdown_job = None
         self.scene_remaining_seconds = 0
+        self.scene_countdown_timer_image = None
+        self.scene_countdown_uses_timer = False
+        self.question_timer_job = None
+        self.question_timer_remaining = 0
+        self.question_timer_image = None
         self.final_scene_active = False
         self.current_lifelines_state = {'5050': True, 'audience': True, 'call': True, 'wise_man': True}
         self.credit_animation_job = None
@@ -58,6 +64,9 @@ class ViewerGUI(tk.Tk):
         self.current_scene_sound_loop = False
         self._last_canvas_size = None
         self._last_panel_size = None
+        self.game_background_pil = None
+        self.option_button_images = {}
+        self.answer_visual_states = {}
 
         self.load_assets()
         self.create_widgets()
@@ -68,15 +77,25 @@ class ViewerGUI(tk.Tk):
         """Tải các tài nguyên hình ảnh cần thiết cho giao diện."""
         try:
             self.background_source = load_background_source()
-            self.btn_images = load_button_images((450, 60))
-            self.answer_images = load_button_images((430, 82))
+            self.btn_images = load_button_images((450, 60), background=WIDGET_BG)
+            self.answer_images = load_button_images((430, 82), background=WIDGET_BG)
             self.logo_image = load_logo_photo((72, 72))
-            self.question_panel_image = load_lozenge_photo((880, 135), "normal", radius=18)
+            self.question_panel_image = load_lozenge_photo((880, 135), "normal", radius=18, background=WIDGET_BG)
+            self.lifeline_icon_images = {
+                (key, used): load_lifeline_icon(key, (72, 43), used=used)
+                for key in ("5050", "call", "audience", "wise_man")
+                for used in (False, True)
+            }
+            self.scene_lifeline_icon_images = {
+                (key, used): load_lifeline_icon(key, (112, 67), used=used)
+                for key in ("5050", "call", "audience", "wise_man")
+                for used in (False, True)
+            }
             self.prize_row_images = {
-                "normal": load_lozenge_photo((300, 31), "normal", radius=7),
-                "milestone": load_lozenge_photo((300, 31), "milestone", radius=7),
-                "selected": load_lozenge_photo((300, 31), "selected", radius=7),
-                "dim": load_lozenge_photo((300, 31), "dim", radius=7),
+                "normal": load_lozenge_photo((300, 28), "normal", radius=7),
+                "milestone": load_lozenge_photo((300, 28), "milestone", radius=7),
+                "selected": load_lozenge_photo((300, 28), "selected", radius=7),
+                "dim": load_lozenge_photo((300, 28), "dim", radius=7),
             }
         except Exception as e:
             messagebox.showerror("Lỗi Tải Ảnh", f"Không thể tải ảnh: {e}")
@@ -101,19 +120,33 @@ class ViewerGUI(tk.Tk):
         )
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
-        self.prize_frame = tk.Frame(self.canvas, bg="#050b23", highlightthickness=1, highlightbackground="#243b78")
+        self.prize_frame = tk.Frame(self.canvas, bg="#030615", highlightthickness=1, highlightbackground="#1f3c78")
         self.prize_frame.place(relx=0.75, rely=0, relwidth=0.25, relheight=1)
         self.prize_background_label = tk.Label(self.prize_frame, bd=0)
         self.prize_background_label.place(x=0, y=0, relwidth=1, relheight=1)
+
+        self.prize_lifeline_row = tk.Frame(self.prize_frame, bg="#030615")
+        self.prize_lifeline_row.pack(fill='x', padx=12, pady=(20, 8))
+        self.prize_lifeline_labels = {}
+        for key in ("5050", "call", "audience", "wise_man"):
+            lifeline_label = tk.Label(
+                self.prize_lifeline_row,
+                image=self.lifeline_icon_images[(key, False)],
+                bg="#030615",
+                bd=0,
+                highlightthickness=0,
+            )
+            lifeline_label.pack(side=tk.LEFT, expand=True, padx=1)
+            self.prize_lifeline_labels[key] = lifeline_label
 
         tk.Label(
             self.prize_frame,
             text="MỐC THƯỞNG",
             font=("Segoe UI", 15, "bold"),
             fg=PANEL_BORDER,
-            bg="#050b23",
+            bg="#030615",
             anchor="w",
-        ).pack(fill='x', padx=20, pady=(18, 10))
+        ).pack(fill='x', padx=26, pady=(2, 8))
 
         self.prize_labels = []
         for i, prize in enumerate(PRIZE_LEVELS):
@@ -122,13 +155,13 @@ class ViewerGUI(tk.Tk):
                 text=f"{15 - i:2d}  ♦  {prize}",
                 image=self.prize_row_images["normal"],
                 compound=tk.CENTER,
-                font=("Segoe UI", 12, "bold"),
-                bg="#050b23",
+                font=("Segoe UI", 10, "bold"),
+                bg="#030615",
                 fg="white",
                 bd=0,
                 highlightthickness=0,
             )
-            label.pack(fill='x', padx=14, pady=2)
+            label.pack(fill='x', padx=10, pady=1)
             self.prize_labels.append(label)
 
         self.main_frame = tk.Frame(self.canvas, bg=WIDGET_BG)
@@ -179,6 +212,12 @@ class ViewerGUI(tk.Tk):
             pady=18,
         )
         self.lbl_question.place(relx=0.5, rely=0.26, anchor=tk.CENTER, width=880, height=135)
+        self.question_timer_label = tk.Label(
+            self.game_area,
+            bg=WIDGET_BG,
+            bd=0,
+            highlightthickness=0,
+        )
 
         self.option_buttons = {}
         self.option_positions = {}
@@ -303,6 +342,12 @@ class ViewerGUI(tk.Tk):
             GRADIENT_START,
             GRADIENT_END,
         )
+        self.game_background_pil = render_background_image(
+            self.background_source,
+            (main_width, game_height),
+            GRADIENT_START,
+            GRADIENT_END,
+        )
         self.game_background_label.config(image=self.game_background_image)
         self.game_background_label.lower()
 
@@ -314,6 +359,45 @@ class ViewerGUI(tk.Tk):
         )
         self.prize_background_label.config(image=self.prize_background_image)
         self.prize_background_label.lower()
+        self.refresh_game_element_assets()
+
+    def crop_game_background(self, relx, rely, item_width, item_height):
+        background = getattr(self, "game_background_pil", None)
+        if background is None:
+            return WIDGET_BG
+
+        bg_width, bg_height = background.size
+        left = int((bg_width * relx) - (item_width / 2))
+        top = int((bg_height * rely) - (item_height / 2))
+        src_box = (
+            max(0, left),
+            max(0, top),
+            min(bg_width, left + item_width),
+            min(bg_height, top + item_height),
+        )
+        crop = Image.new("RGBA", (item_width, item_height), WIDGET_BG)
+        if src_box[2] > src_box[0] and src_box[3] > src_box[1]:
+            crop.alpha_composite(
+                background.crop(src_box).convert("RGBA"),
+                (src_box[0] - left, src_box[1] - top),
+            )
+        return crop
+
+    def refresh_game_element_assets(self):
+        if not hasattr(self, "lbl_question"):
+            return
+
+        question_bg = self.crop_game_background(0.5, 0.26, 880, 135)
+        self.question_panel_image = load_lozenge_photo((880, 135), "normal", radius=18, background=question_bg)
+        self.lbl_question.config(image=self.question_panel_image)
+
+        self.option_button_images = {}
+        for option, pos in self.option_positions.items():
+            option_bg = self.crop_game_background(pos["relx"], pos["rely"], 430, 82)
+            self.option_button_images[option] = load_button_images((430, 82), background=option_bg)
+
+        for option in self.option_buttons:
+            self.style_answer_button(option, self.answer_visual_states.get(option, "normal"))
 
     def show_overlay(self, message):
         """Hiển thị một lớp phủ với thông báo."""
@@ -329,6 +413,7 @@ class ViewerGUI(tk.Tk):
         self.hide_scene()
         self.overlay_frame.place_forget()
         self.game_area.place(relx=0.5, rely=0.58, anchor=tk.CENTER, relwidth=1, relheight=0.74)
+        self.question_timer_label.tkraise()
         self.force_repaint()
 
     def force_repaint(self):
@@ -372,17 +457,24 @@ class ViewerGUI(tk.Tk):
 
     def style_answer_button(self, option, state):
         style = ANSWER_STYLES[state]
+        self.answer_visual_states[option] = state
+        images = self.option_button_images.get(option, self.answer_images)
+        image_key = style.get("image", state)
         self.option_buttons[option].config(
-            image=self.answer_images.get(style.get("image", state), self.answer_images["normal"]),
+            image=images.get(image_key, self.answer_images.get(image_key, self.answer_images["normal"])),
             bg=WIDGET_BG,
             fg=style["fg"],
             highlightbackground=style["border"],
         )
 
     def hide_scene(self):
+        self.cancel_question_lifeline_timer()
         if self.scene_countdown_job:
             self.after_cancel(self.scene_countdown_job)
             self.scene_countdown_job = None
+        self.scene_countdown_uses_timer = False
+        self.scene_countdown_timer_image = None
+        self.scene_countdown.config(text="", image="")
         self.stop_credit_animation()
         self.hide_prize_scene_board()
         self.hide_poll_scene_board()
@@ -500,55 +592,50 @@ class ViewerGUI(tk.Tk):
             self.scene_message.pack_forget()
         for child in self.prize_scene_frame.winfo_children():
             child.destroy()
-        self.scene_prize_row_images = []
 
         window_height = max(self.winfo_height(), 720)
         compact = window_height < 860
-        lifeline_font = ("Segoe UI", 10 if compact else 12, "bold")
-        prize_font = ("Consolas", 14 if compact else 17, "bold")
+        prize_font = ("Segoe UI", 15 if compact else 18, "bold")
         row_pady = 0 if compact else 1
+        self.scene_prize_row_images = []
 
         lifeline_row = tk.Frame(self.prize_scene_frame, bg="#020817")
-        lifeline_row.pack(fill="x", pady=(0, 7 if compact else 12))
-        for key, label in [
-            ("5050", "50:50"),
-            ("audience", "KHÁN GIẢ"),
-            ("call", "GỌI ĐIỆN"),
-            ("wise_man", "TƯ VẤN"),
-        ]:
-            available = self.current_lifelines_state.get(key, True)
-            locked = key == "wise_man" and self.current_level < 6 and available
-            status = "KHÓA" if locked else ("OK" if available else "X")
-            bg = "#26304a" if locked else ("#12346f" if available else "#64192b")
-            fg = TEXT_MUTED if locked else ("#8ff0c5" if available else "#ff9caf")
+        lifeline_row.pack(pady=(0, 12 if compact else 18))
+        for key in ("5050", "call", "audience", "wise_man"):
+            used = not self.current_lifelines_state.get(key, True)
             tk.Label(
                 lifeline_row,
-                text=f"{label}  {status}",
-                bg=bg,
-                fg=fg,
-                font=lifeline_font,
-                padx=10 if compact else 14,
-                pady=5 if compact else 7,
+                image=self.scene_lifeline_icon_images[(key, used)],
+                bg="#020817",
+                bd=0,
+                highlightthickness=0,
             ).pack(side=tk.LEFT, padx=5)
 
         board = tk.Frame(self.prize_scene_frame, bg="#020817")
         board.pack(fill="both", expand=True)
-        horizontal_pad = 110 if compact else 180
-        row_width = max(760, self.winfo_width() - (horizontal_pad * 2) - 30)
-        row_height = 29 if compact else 34
+        horizontal_pad = 90 if compact else 170
+        row_width = max(720, self.winfo_width() - (horizontal_pad * 2) - 40)
+        row_height = 31 if compact else 36
         for index, prize in enumerate(PRIZE_LEVELS):
             level = 15 - index
             is_current = level == self.current_level
             is_passed = level < self.current_level
             is_milestone = level in [5, 10, 15]
-            image_state = "selected" if is_current else ("dim" if is_passed else ("milestone" if is_milestone else "normal"))
+            if is_passed:
+                image_state = "dim"
+                fg = PASSED_PRIZE_COLOR
+            elif is_current:
+                image_state = "selected"
+                fg = "#050E21"
+            else:
+                image_state = "milestone" if is_milestone else "normal"
+                fg = MILESTONE_COLOR if is_milestone else DEFAULT_PRIZE_COLOR
+
             row_image = load_lozenge_photo((row_width, row_height), image_state, radius=7)
             self.scene_prize_row_images.append(row_image)
-            fg = "#06122f" if is_current else (PASSED_PRIZE_COLOR if is_passed else (MILESTONE_COLOR if is_milestone else DEFAULT_PRIZE_COLOR))
-            row_text = f"{'▶' if is_current else ' '}   {level:02d}   ◆   {prize} VNĐ"
             tk.Label(
                 board,
-                text=row_text,
+                text=f"{level:02d}   ♦   {prize} VNĐ",
                 image=row_image,
                 compound=tk.CENTER,
                 bg="#020817",
@@ -697,7 +784,7 @@ class ViewerGUI(tk.Tk):
             self.scene_title.pack_configure(expand=False, fill="x", pady=(24, 8))
             self.scene_message.pack_configure(fill="both", expand=True, padx=100)
             self.scene_countdown.pack_configure(pady=(4, 18))
-        elif scene in ['credits', 'poll']:
+        elif scene in ['credits', 'poll', 'lifeline_timer']:
             self.scene_title.pack_configure(expand=False, fill="x", pady=(42, 12))
             self.scene_message.pack_configure(fill="both", expand=True, padx=130)
             self.scene_countdown.pack_configure(pady=(8, 30))
@@ -741,6 +828,9 @@ class ViewerGUI(tk.Tk):
             self.scene_message.config(font=("Segoe UI", 24, "bold"), justify=tk.CENTER)
         elif scene == 'poll':
             message = ""
+        elif scene == 'lifeline_timer':
+            self.scene_title.config(font=("Segoe UI", 42, "bold"))
+            self.scene_message.config(font=("Segoe UI", 22, "bold"), justify=tk.CENTER)
         elif scene == 'mini_quiz':
             message = message + "\n\nHãy giữ câu trả lời của bạn cho phần quay lại."
 
@@ -754,7 +844,7 @@ class ViewerGUI(tk.Tk):
             self.show_poll_scene_board(payload)
         self.scene_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
         self.scene_frame.tkraise()
-        self.start_scene_countdown(data.get('countdown_seconds', 0))
+        self.start_scene_countdown(data.get('countdown_seconds', 0), use_timer=(scene == 'lifeline_timer'))
         if not (scene == 'poll' and not data.get('sound')):
             self.play_scene_audio(data.get('sound'), data.get('sound_loop', False))
         if scene == 'credits':
@@ -782,26 +872,30 @@ class ViewerGUI(tk.Tk):
         parts = []
         for key, label in labels:
             available = self.current_lifelines_state.get(key, True)
-            if key == "wise_man" and self.current_level < 6 and available:
-                status = "KHÓA"
-            else:
-                status = "OK" if available else "X"
+            status = "OK" if available else "X"
             parts.append(f"{label}: {status}")
         return ["  " + "   ".join(parts)]
 
-    def start_scene_countdown(self, seconds):
+    def start_scene_countdown(self, seconds, use_timer=False):
         if self.scene_countdown_job:
             self.after_cancel(self.scene_countdown_job)
             self.scene_countdown_job = None
         self.scene_remaining_seconds = int(seconds or 0)
+        self.scene_countdown_uses_timer = bool(use_timer)
         self.update_scene_countdown()
 
     def update_scene_countdown(self):
         if self.scene_remaining_seconds <= 0:
-            self.scene_countdown.config(text="")
+            self.scene_countdown.config(text="", image="")
+            self.scene_countdown_timer_image = None
             return
         minutes, seconds = divmod(self.scene_remaining_seconds, 60)
-        self.scene_countdown.config(text=f"{minutes:02d}:{seconds:02d}")
+        if self.scene_countdown_uses_timer and self.scene_remaining_seconds <= 60:
+            self.scene_countdown_timer_image = load_timer_photo((150, 150), self.scene_remaining_seconds)
+            self.scene_countdown.config(text="", image=self.scene_countdown_timer_image)
+        else:
+            self.scene_countdown.config(text=f"{minutes:02d}:{seconds:02d}", image="")
+            self.scene_countdown_timer_image = None
         self.scene_remaining_seconds -= 1
         self.scene_countdown_job = self.after(1000, self.update_scene_countdown)
 
@@ -864,6 +958,11 @@ class ViewerGUI(tk.Tk):
             self.update_question_display(data)
         elif msg_type == 'lifeline_result':
             self.handle_lifeline_result(data)
+        elif msg_type == 'lifeline_state':
+            self.current_lifelines_state = data.get('lifelines', self.current_lifelines_state)
+            self.update_lifeline_display()
+        elif msg_type == 'lifeline_timer':
+            self.start_question_lifeline_timer(data)
         elif msg_type == 'answer_locked':
             self.show_locked_answer(data)
         elif msg_type == 'answer_unlocked':
@@ -896,12 +995,49 @@ class ViewerGUI(tk.Tk):
             if not self.final_scene_active:
                 self.reset_ui_for_new_game()
 
+    def start_question_lifeline_timer(self, data):
+        self.cancel_question_lifeline_timer()
+        self.hide_scene()
+        self.overlay_frame.place_forget()
+        self.game_area.place(relx=0.5, rely=0.58, anchor=tk.CENTER, relwidth=1, relheight=0.74)
+        self.question_timer_remaining = int(data.get('seconds', 30) or 30)
+        sound_name = data.get('sound')
+        if sound_name and self.audio_manager.has_sound(sound_name):
+            self.audio_manager.stop_all()
+            self.audio_manager.play(sound_name, loop=False)
+        self.question_timer_label.place(relx=0.5, rely=0.105, anchor=tk.CENTER, width=82, height=82)
+        self.question_timer_label.tkraise()
+        self.update_question_lifeline_timer()
+
+    def update_question_lifeline_timer(self):
+        if self.question_timer_remaining <= 0:
+            self.cancel_question_lifeline_timer()
+            return
+        self.question_timer_image = load_timer_photo((78, 78), self.question_timer_remaining)
+        self.question_timer_label.config(image=self.question_timer_image)
+        self.question_timer_remaining -= 1
+        self.question_timer_job = self.after(1000, self.update_question_lifeline_timer)
+
+    def cancel_question_lifeline_timer(self):
+        if self.question_timer_job:
+            try:
+                self.after_cancel(self.question_timer_job)
+            except tk.TclError:
+                pass
+            self.question_timer_job = None
+        if hasattr(self, "question_timer_label"):
+            self.question_timer_label.place_forget()
+        self.question_timer_remaining = 0
+        self.question_timer_image = None
+
     def update_question_display(self, data):
         """Cập nhật giao diện với câu hỏi và các lựa chọn mới."""
         self.stop_scene_audio()
         self.final_scene_active = False
         self.current_level = data['level']
         self.current_lifelines_state = data.get('lifelines', self.current_lifelines_state)
+        if data.get('lifeline_reveal') == '5050':
+            self.audio_manager.play('lifeline_5050')
         self.lbl_question.config(text=f"CÂU {self.current_level} - {data['prize']} VNĐ\n{data['question']}")
 
         for option, btn in self.option_buttons.items():
@@ -919,24 +1055,35 @@ class ViewerGUI(tk.Tk):
 
     def update_prize_display(self, current_level):
         """Cập nhật màu sắc của bảng giải thưởng."""
+        self.update_lifeline_display()
         for i, label in enumerate(self.prize_labels):
             prize_level = 15 - i
             is_milestone = prize_level in [5, 10, 15]
 
             if prize_level < current_level:
-                label.config(image=self.prize_row_images["dim"], bg="#050b23", fg=PASSED_PRIZE_COLOR)
+                label.config(image=self.prize_row_images["dim"], bg="#030615", fg=PASSED_PRIZE_COLOR)
             elif prize_level == current_level:
-                label.config(image=self.prize_row_images["selected"], bg="#050b23", fg="#050E21")
+                label.config(image=self.prize_row_images["selected"], bg="#030615", fg="#050E21")
             else:
                 color = MILESTONE_COLOR if is_milestone else DEFAULT_PRIZE_COLOR
                 image_key = "milestone" if is_milestone else "normal"
-                label.config(image=self.prize_row_images[image_key], bg="#050b23", fg=color)
+                label.config(image=self.prize_row_images[image_key], bg="#030615", fg=color)
+
+    def update_lifeline_display(self):
+        if not hasattr(self, "prize_lifeline_labels"):
+            return
+        for key, label in self.prize_lifeline_labels.items():
+            used = not self.current_lifelines_state.get(key, True)
+            label.config(image=self.lifeline_icon_images[(key, used)])
 
     def handle_lifeline_result(self, data):
         """Xử lý kết quả từ sự trợ giúp (chỉ hiển thị 50:50)."""
+        self.cancel_question_lifeline_timer()
+        self.audio_manager.stop_all()
         lifeline = data.get('lifeline')
         if lifeline in self.current_lifelines_state:
             self.current_lifelines_state[lifeline] = False
+        self.update_lifeline_display()
         if lifeline == '5050' and 'options' in data:
             for option, btn in self.option_buttons.items():
                 if not data['options'].get(option):
@@ -967,6 +1114,7 @@ class ViewerGUI(tk.Tk):
 
     def show_give_up_regret(self, data):
         self.current_lifelines_state = {key: False for key in self.current_lifelines_state}
+        self.update_lifeline_display()
         self.status_bar.config(
             text=f"Thí sinh đã give up câu {data.get('level')}. Đang chờ đáp án tiếc nuối..."
         )

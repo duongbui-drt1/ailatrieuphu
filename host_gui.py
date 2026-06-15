@@ -1262,12 +1262,15 @@ class HostGUI(tk.Tk):
             self.handle_call_request(data['question'], data['answer'])
 
     def handle_audience_request(self):
-        self.log("Chờ 2 giây cho nhạc hiệu hỏi khán giả, sau đó mở bộ đếm 30 giây...")
-        self.after(2000, self.open_audience_dialog)
+        self.log("Khán giả: MC mở bảng nhập và tự bấm bắt đầu 30 giây khi sẵn sàng.")
+        self.open_audience_dialog()
 
     def open_audience_dialog(self):
-        self.log("Đang nhập ý kiến 3 khán giả trong 30 giây...")
-        dialog = AudienceDialog(self)
+        self.log("Đang chờ MC bắt đầu ghi nhận ý kiến khán giả.")
+        dialog = AudienceDialog(
+            self,
+            on_start=lambda: server_logic.start_lifeline_timer_from_host('audience', 30),
+        )
         results = dialog.result
         if results and all(r.upper() in ['A', 'B', 'C', 'D'] for r in results if r):
             server_logic.broadcast({'type': 'lifeline_result', 'lifeline': 'audience', 'opinions': [r.upper() for r in results]})
@@ -1277,20 +1280,35 @@ class HostGUI(tk.Tk):
             self.log("Đã hủy hoặc nhập sai ý kiến khán giả.")
 
     def handle_call_request(self, question, answer):
-        self.log("Gọi điện: mở bộ đếm 30 giây để host nhập gợi ý.")
+        self.log("Gọi điện: MC bấm bắt đầu 30 giây khi cuộc gọi sẵn sàng.")
         self.open_call_dialog(question, answer)
 
     def open_call_dialog(self, question, answer):
-        self.log("Đang nhập gợi ý gọi điện trong 30 giây...")
-        dialog = CallDialog(self, question, answer)
+        self.log("Đang chờ MC bắt đầu ghi nhận gợi ý gọi điện.")
+        dialog = CallDialog(
+            self,
+            question,
+            answer,
+            title="Gọi Điện Cho Người Thân",
+            prompt="Nhập gợi ý từ cuộc gọi 30 giây:",
+            on_start=lambda: server_logic.start_lifeline_timer_from_host('call', 30),
+        )
         suggestion = (dialog.result or "").strip()
         message = f"Người được gọi gợi ý: {suggestion}" if suggestion else "Người được gọi không đưa ra được gợi ý."
         server_logic.broadcast({'type': 'lifeline_result', 'lifeline': 'call', 'message': message})
         self.log("Đã gửi gợi ý gọi điện cho thí sinh.")
 
     def handle_wise_man_request(self, question, answer):
-        self.log("Đang chờ gợi ý từ Host cho Tổ Tư Vấn...")
-        suggestion = simpledialog.askstring("Yêu cầu từ Tổ Tư Vấn", f"Người chơi cần trợ giúp!\n\nCâu hỏi: {question}\nĐáp án đúng: {answer}\n\nNhập gợi ý của bạn:", parent=self)
+        self.log("Người đồng hành: MC bấm bắt đầu 30 giây khi sẵn sàng.")
+        dialog = CallDialog(
+            self,
+            question,
+            answer,
+            title="Người Đồng Hành",
+            prompt="Nhập gợi ý từ người đồng hành 30 giây:",
+            on_start=lambda: server_logic.start_lifeline_timer_from_host('wise_man', 30),
+        )
+        suggestion = (dialog.result or "").strip()
         msg_to_send = f"Tổ tư vấn gợi ý: {suggestion}" if suggestion else "Tổ tư vấn không đưa ra được gợi ý."
         server_logic.broadcast({'type': 'lifeline_result', 'lifeline': 'wise_man', 'message': msg_to_send})
         self.log(f"Đã gửi phản hồi Tổ Tư Vấn.")
@@ -1551,23 +1569,58 @@ class PollControlWindow(tk.Toplevel):
         self.destroy()
 
 class AudienceDialog(simpledialog.Dialog):
-    def body(self, master):
-        self.title("Hỏi Ý Kiến Khán Giả")
+    def __init__(self, parent, on_start=None):
+        self.on_start = on_start
+        self.countdown_started = False
+        self.prestart_remaining = 5
+        self.prestart_job = None
         self.remaining_seconds = 30
         self.timer_job = None
+        super().__init__(parent, "Hỏi Ý Kiến Khán Giả")
+
+    def body(self, master):
         tk.Label(master, text="Nhập câu trả lời của 3 khán giả may mắn:").pack()
-        self.timer_label = tk.Label(master, text="", fg="red", font=("Segoe UI", 10, "bold"))
+        self.timer_label = tk.Label(master, text="Popup đã mở. Chờ hiệu ứng trợ giúp 05 giây...", fg="#7a4b00", font=("Segoe UI", 10, "bold"))
         self.timer_label.pack(pady=(2, 8))
+        self.start_button = tk.Button(master, text="Chờ hiệu ứng 05s", command=self.start_countdown, state=tk.DISABLED)
+        self.start_button.pack(pady=(0, 8))
         self.entries = []
         for i in range(3):
             frame = tk.Frame(master)
             tk.Label(frame, text=f"Khán giả {i+1}:").pack(side="left")
-            entry = tk.Entry(frame, width=5)
+            entry = tk.Entry(frame, width=5, state=tk.DISABLED)
             entry.pack(side="left", padx=5)
             self.entries.append(entry)
             frame.pack(pady=2)
-        self.update_countdown()
+        self.after(0, self.update_prestart_delay)
         return self.entries[0]
+
+    def update_prestart_delay(self):
+        if self.countdown_started:
+            self.prestart_job = None
+            return
+        if self.prestart_remaining <= 0:
+            self.prestart_job = None
+            self.prestart_remaining = 0
+            self.timer_label.config(text="MC bấm bắt đầu khi đã sẵn sàng ghi nhận 30 giây.")
+            self.start_button.config(text="Bắt đầu 30 giây", state=tk.NORMAL)
+            return
+        self.timer_label.config(text=f"Popup đã mở. Chờ hiệu ứng trợ giúp {self.prestart_remaining:02d} giây...")
+        self.start_button.config(text=f"Chờ hiệu ứng {self.prestart_remaining:02d}s", state=tk.DISABLED)
+        self.prestart_remaining -= 1
+        self.prestart_job = self.after(1000, self.update_prestart_delay)
+
+    def start_countdown(self):
+        if self.countdown_started or self.prestart_job or self.prestart_remaining > 0:
+            return
+        self.countdown_started = True
+        self.start_button.config(state=tk.DISABLED)
+        for entry in self.entries:
+            entry.config(state=tk.NORMAL)
+        if self.on_start:
+            self.on_start()
+        self.update_countdown()
+        self.entries[0].focus_set()
 
     def update_countdown(self):
         self.timer_label.config(text=f"Tự động chốt sau {self.remaining_seconds:02d} giây")
@@ -1579,6 +1632,12 @@ class AudienceDialog(simpledialog.Dialog):
         self.timer_job = self.after(1000, self.update_countdown)
 
     def cancel(self, event=None):
+        if self.prestart_job:
+            try:
+                self.after_cancel(self.prestart_job)
+            except tk.TclError:
+                pass
+            self.prestart_job = None
         if self.timer_job:
             try:
                 self.after_cancel(self.timer_job)
@@ -1586,28 +1645,67 @@ class AudienceDialog(simpledialog.Dialog):
                 pass
             self.timer_job = None
         super().cancel(event)
+
+    def validate(self):
+        if not self.countdown_started:
+            messagebox.showwarning("Chưa bắt đầu", "Hãy chờ hiệu ứng 5 giây rồi bấm bắt đầu 30 giây trước khi chốt.")
+            return False
+        return True
 
     def apply(self):
         self.result = [e.get().strip() for e in self.entries]
 
 class CallDialog(simpledialog.Dialog):
-    def __init__(self, parent, question, answer):
+    def __init__(self, parent, question, answer, title="Gọi Điện Cho Người Thân", prompt="Nhập gợi ý từ cuộc gọi 30 giây:", on_start=None):
         self.question = question
         self.answer = answer
+        self.prompt = prompt
+        self.on_start = on_start
+        self.countdown_started = False
+        self.prestart_remaining = 5
+        self.prestart_job = None
         self.remaining_seconds = 30
         self.timer_job = None
-        super().__init__(parent, "Gọi Điện Cho Người Thân")
+        super().__init__(parent, title)
 
     def body(self, master):
-        tk.Label(master, text="Nhập gợi ý từ cuộc gọi 30 giây:", font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        tk.Label(master, text=self.prompt, font=("Segoe UI", 10, "bold")).pack(anchor="w")
         tk.Label(master, text=f"Câu hỏi: {self.question}", wraplength=520, justify=tk.LEFT).pack(anchor="w", pady=(8, 2))
         tk.Label(master, text=f"Đáp án đúng nội bộ: {self.answer}", fg="#7a4b00").pack(anchor="w", pady=(0, 8))
-        self.timer_label = tk.Label(master, text="", fg="red", font=("Segoe UI", 10, "bold"))
+        self.timer_label = tk.Label(master, text="Popup đã mở. Chờ hiệu ứng trợ giúp 05 giây...", fg="#7a4b00", font=("Segoe UI", 10, "bold"))
         self.timer_label.pack(anchor="w", pady=(0, 8))
-        self.entry = tk.Entry(master, width=58)
+        self.start_button = tk.Button(master, text="Chờ hiệu ứng 05s", command=self.start_countdown, state=tk.DISABLED)
+        self.start_button.pack(anchor="w", pady=(0, 8))
+        self.entry = tk.Entry(master, width=58, state=tk.DISABLED)
         self.entry.pack(fill="x")
-        self.update_countdown()
+        self.after(0, self.update_prestart_delay)
         return self.entry
+
+    def update_prestart_delay(self):
+        if self.countdown_started:
+            self.prestart_job = None
+            return
+        if self.prestart_remaining <= 0:
+            self.prestart_job = None
+            self.prestart_remaining = 0
+            self.timer_label.config(text="MC bấm bắt đầu khi đã sẵn sàng ghi nhận 30 giây.")
+            self.start_button.config(text="Bắt đầu 30 giây", state=tk.NORMAL)
+            return
+        self.timer_label.config(text=f"Popup đã mở. Chờ hiệu ứng trợ giúp {self.prestart_remaining:02d} giây...")
+        self.start_button.config(text=f"Chờ hiệu ứng {self.prestart_remaining:02d}s", state=tk.DISABLED)
+        self.prestart_remaining -= 1
+        self.prestart_job = self.after(1000, self.update_prestart_delay)
+
+    def start_countdown(self):
+        if self.countdown_started or self.prestart_job or self.prestart_remaining > 0:
+            return
+        self.countdown_started = True
+        self.start_button.config(state=tk.DISABLED)
+        self.entry.config(state=tk.NORMAL)
+        if self.on_start:
+            self.on_start()
+        self.update_countdown()
+        self.entry.focus_set()
 
     def update_countdown(self):
         self.timer_label.config(text=f"Tự động chốt sau {self.remaining_seconds:02d} giây")
@@ -1619,6 +1717,12 @@ class CallDialog(simpledialog.Dialog):
         self.timer_job = self.after(1000, self.update_countdown)
 
     def cancel(self, event=None):
+        if self.prestart_job:
+            try:
+                self.after_cancel(self.prestart_job)
+            except tk.TclError:
+                pass
+            self.prestart_job = None
         if self.timer_job:
             try:
                 self.after_cancel(self.timer_job)
@@ -1626,6 +1730,12 @@ class CallDialog(simpledialog.Dialog):
                 pass
             self.timer_job = None
         super().cancel(event)
+
+    def validate(self):
+        if not self.countdown_started:
+            messagebox.showwarning("Chưa bắt đầu", "Hãy chờ hiệu ứng 5 giây rồi bấm bắt đầu 30 giây trước khi chốt.")
+            return False
+        return True
 
     def apply(self):
         self.result = self.entry.get().strip()

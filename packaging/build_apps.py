@@ -59,6 +59,27 @@ def app_display_name(app_key: str) -> str:
     return APPS[app_key].get("display_name", APPS[app_key]["name"])
 
 
+def macos_release_version(version: str) -> str:
+    base = str(version).split("-", 1)[0]
+    parts = []
+    for chunk in base.split("."):
+        if chunk.isdigit():
+            parts.append(chunk)
+    while len(parts) < 3:
+        parts.append("0")
+    return ".".join(parts[:3])
+
+
+def macos_build_version(version: str) -> str:
+    release = macos_release_version(version)
+    suffix = str(version).split("-", 1)[1:] or [""]
+    build_number = 0
+    for chunk in suffix[0].replace("-", ".").split("."):
+        if chunk.isdigit():
+            build_number = int(chunk)
+    return f"{release}.{build_number}" if build_number else release
+
+
 def data_files() -> list[tuple[Path, str]]:
     pairs: list[tuple[Path, str]] = []
     for folder_name in ("audio", "images"):
@@ -225,6 +246,8 @@ def apply_macos_bundle_metadata(app_key: str, version: str) -> None:
         return
     app = APPS[app_key]
     display_name = app_display_name(app_key)
+    short_version = macos_release_version(version)
+    build_version = macos_build_version(version)
     plist_path = DIST_DIR / f"{app['name']}.app" / "Contents" / "Info.plist"
     if not plist_path.exists():
         return
@@ -237,8 +260,8 @@ def apply_macos_bundle_metadata(app_key: str, version: str) -> None:
             "CFBundleName": display_name,
             "CFBundleGetInfoString": f"{APP_PRODUCT_NAME} {version}, {APP_AUTHOR}",
             "CFBundleIdentifier": f"{APP_IDENTIFIER_ROOT}.{app_key}",
-            "CFBundleShortVersionString": version,
-            "CFBundleVersion": version,
+            "CFBundleShortVersionString": short_version,
+            "CFBundleVersion": build_version,
             "NSHumanReadableCopyright": APP_COPYRIGHT,
         }
     )

@@ -12,6 +12,12 @@ Tác giả/phát triển: **Duli Production LLC.**
 
 Bản quyền: **2020 - 2026 Duli Production LLC.**
 
+## Trạng Thái Bản 2.0 Beta
+
+Phiên bản hiện tại: **2.0.0-beta.1**.
+
+> Cảnh báo anh em: đây là **pre-release beta**. Này, dùng beta mà lỗi lòi ra giữa buổi tổng duyệt thì đừng trách nhé. Bản này để test giao diện 2.0, timing âm thanh, trợ giúp và build desktop mới; chưa nên coi là bản ổn định cho show thật nếu chưa chạy thử đủ một lượt.
+
 ## Tải Bản Cài
 
 Vào mục **Releases** trên GitHub và chọn đúng hệ điều hành.
@@ -22,6 +28,7 @@ Tải file:
 
 ```text
 AiLaTrieuPhu-Windows-Installer-windows_vX.Y.Z.zip
+AiLaTrieuPhu-Windows-Installer-windows_v2.0.0-beta.1.zip
 ```
 
 Giải nén rồi chạy:
@@ -50,6 +57,7 @@ Tải file:
 
 ```text
 AiLaTrieuPhu-macOS-Installer-macos_vX.Y.Z.zip
+AiLaTrieuPhu-macOS-Installer-macos_v2.0.0-beta.1.zip
 ```
 
 Giải nén rồi chạy:
@@ -119,12 +127,12 @@ Luật tiền thưởng:
 
 Các trợ giúp hiện có:
 
-- **50:50**: loại hai đáp án sai.
-- **Khán Giả**: mở poll 30 giây, có delay 2 giây để nhạc hiệu chạy hết nốt.
-- **Gọi Điện**: chạy 30 giây, Host có ô nhập gợi ý đáp án.
-- **Tư Vấn**: gợi ý theo xác suất 50/50, không luôn đúng 100%.
+- **50:50**: loại hai đáp án sai. Trình tự âm thanh là `lifeline_click`, chờ 5 giây, sau đó phát `lifeline_5050` đồng thời xóa hai đáp án sai.
+- **Khán Giả**: Host mở popup ngay sau khi người chơi bấm trợ giúp. Popup chờ hiệu ứng 5 giây rồi mới cho MC bấm bắt đầu vòng 30 giây.
+- **Gọi Điện**: Host có ô nhập gợi ý đáp án, nhạc/vòng 30 giây bắt đầu ngay khi MC bấm **Bắt đầu 30 giây**.
+- **Tư Vấn / Nhà Thông Thái**: ẩn trước câu 6, từ câu 6 mới hiện. Host nhập gợi ý sau vòng 30 giây; không còn tự trả lời đúng 100%.
 
-Khi bấm trợ giúp, hệ thống phát hiệu ứng trước, chờ ngắn rồi mới mở kết quả. Logic audio đã tách để tránh chồng âm khi dùng trợ giúp liên tiếp.
+Các popup trợ giúp trên Host không cho chốt sớm nếu chưa qua 5 giây hiệu ứng và chưa bắt đầu vòng 30 giây. Logic audio đã tách để tránh chồng âm khi dùng trợ giúp liên tiếp.
 
 ## Pack Câu Hỏi
 
@@ -165,6 +173,15 @@ images/logo.png
 images/background.png
 images/app.ico       # tùy chọn cho Windows
 images/app.icns      # tùy chọn cho macOS
+images/lifeline_5050.png
+images/lifeline_5050_used.png
+images/lifeline_call.png
+images/lifeline_call_used.png
+images/lifeline_audience.png
+images/lifeline_audience_used.png
+images/lifeline_wise_man.png
+images/lifeline_wise_man_used.png
+images/timer_30.png ... images/timer_00.png
 ```
 
 Các file âm thanh nên có:
@@ -180,6 +197,7 @@ audio/lifeline_5050.mp3
 audio/audience_countdown.mp3
 audio/lifeline_call.mp3
 audio/lifeline_wise_man.mp3
+audio/wise_man_countdown.mp3
 audio/viewer_break.mp3
 audio/viewer_poll.mp3
 audio/program_end.mp3
@@ -254,19 +272,22 @@ Quy ước version:
 - `1.x.x`: bản lớn, thay đổi nhiều.
 - `x.1.x`: bản vừa hoặc fix ổn định.
 - `x.x.1`: bản vá nhỏ.
+- `x.y.z-beta.n`: bản thử nghiệm/pre-release, có thể lỗi và cần test kỹ trước show thật.
+
+Tag có chữ `alpha`, `beta`, `rc` hoặc `pre` sẽ được GitHub Actions tạo dưới dạng **pre-release**.
 
 Tạo release Windows:
 
 ```bash
-git tag windows_v1.1.9
-git push origin windows_v1.1.9
+git tag windows_v2.0.0-beta.1
+git push origin windows_v2.0.0-beta.1
 ```
 
 Tạo release macOS:
 
 ```bash
-git tag macos_v1.1.9
-git push origin macos_v1.1.9
+git tag macos_v2.0.0-beta.1
+git push origin macos_v2.0.0-beta.1
 ```
 
 Workflow sẽ upload:

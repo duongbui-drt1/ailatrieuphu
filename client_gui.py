@@ -7,7 +7,8 @@ import random
 import string
 import time
 try:
-    from ui_assets import ColorButton, apply_window_icon, load_background_source, load_button_images, load_logo_photo, load_lozenge_photo, render_background
+    from PIL import Image
+    from ui_assets import ColorButton, apply_window_icon, load_background_source, load_button_images, load_lifeline_icon, load_logo_photo, load_lozenge_photo, load_timer_photo, render_background, render_background_image
 except ImportError:
     messagebox.showerror("Thiếu thư viện", "Vui lòng cài đặt: pip install Pillow")
     exit()
@@ -26,7 +27,7 @@ PRIZE_LEVELS = [
 # Màu sắc - làm đậm màu đáp án
 GRADIENT_START = "#081d4f"
 GRADIENT_END = "#030712"
-WIDGET_BG = "#07143a"
+WIDGET_BG = "#050b18"
 PANEL_BG = "#0F254E"
 PANEL_BORDER = "#00D2FF"
 TEXT_MUTED = "#aebbe8"
@@ -56,11 +57,17 @@ class GameClientGUI(tk.Toplevel):
         self.pending_lifeline_type = None
         self.pending_lifeline_job = None
         self.lifeline_audio_job = None
+        self.lifeline_timer_job = None
+        self.lifeline_timer_remaining = 0
+        self.lifeline_timer_image = None
         self.answer_buttons_locked = False
         self.blinking_job = None
         self.last_background_music = None
         self._last_canvas_size = None
         self._last_panel_size = None
+        self.game_background_pil = None
+        self.option_button_images = {}
+        self.answer_visual_states = {}
 
         self.load_assets()
         self.create_widgets()
@@ -69,14 +76,19 @@ class GameClientGUI(tk.Toplevel):
     def load_assets(self):
         try:
             self.background_source = load_background_source()
-            self.btn_images = load_button_images((470, 82))
+            self.btn_images = load_button_images((470, 82), background=WIDGET_BG)
             self.logo_image = load_logo_photo((72, 72))
-            self.question_panel_image = load_lozenge_photo((880, 135), "normal", radius=18)
+            self.question_panel_image = load_lozenge_photo((880, 135), "normal", radius=18, background=WIDGET_BG)
+            self.lifeline_icon_images = {
+                (key, used): load_lifeline_icon(key, (96, 58), used=used)
+                for key in ("5050", "call", "audience", "wise_man")
+                for used in (False, True)
+            }
             self.prize_row_images = {
-                "normal": load_lozenge_photo((300, 31), "normal", radius=7),
-                "milestone": load_lozenge_photo((300, 31), "milestone", radius=7),
-                "selected": load_lozenge_photo((300, 31), "selected", radius=7),
-                "dim": load_lozenge_photo((300, 31), "dim", radius=7),
+                "normal": load_lozenge_photo((300, 30), "normal", radius=7),
+                "milestone": load_lozenge_photo((300, 30), "milestone", radius=7),
+                "selected": load_lozenge_photo((300, 30), "selected", radius=7),
+                "dim": load_lozenge_photo((300, 30), "dim", radius=7),
             }
         except Exception as e:
             messagebox.showerror("Lỗi Tải Ảnh", f"Không thể tải ảnh: {e}")
@@ -100,7 +112,7 @@ class GameClientGUI(tk.Toplevel):
         )
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
-        self.prize_frame = tk.Frame(self.canvas, bg="#050b23", highlightthickness=1, highlightbackground="#243b78")
+        self.prize_frame = tk.Frame(self.canvas, bg="#030615", highlightthickness=1, highlightbackground="#1f3c78")
         self.prize_frame.place(relx=0.75, rely=0, relwidth=0.25, relheight=1)
         self.prize_background_label = tk.Label(self.prize_frame, bd=0)
         self.prize_background_label.place(x=0, y=0, relwidth=1, relheight=1)
@@ -110,9 +122,9 @@ class GameClientGUI(tk.Toplevel):
             text="MỐC THƯỞNG",
             font=("Segoe UI", 15, "bold"),
             fg=PANEL_BORDER,
-            bg="#050b23",
+            bg="#030615",
             anchor="w",
-        ).pack(fill='x', padx=20, pady=(18, 10))
+        ).pack(fill='x', padx=26, pady=(22, 10))
 
         self.prize_labels = []
         for i, prize in enumerate(PRIZE_LEVELS):
@@ -121,13 +133,13 @@ class GameClientGUI(tk.Toplevel):
                 text=f"{15 - i:2d}  ♦  {prize}",
                 image=self.prize_row_images["normal"],
                 compound=tk.CENTER,
-                font=("Segoe UI", 12, "bold"),
-                bg="#050b23",
+                font=("Segoe UI", 11, "bold"),
+                bg="#030615",
                 fg="white",
                 bd=0,
                 highlightthickness=0,
             )
-            label.pack(fill='x', padx=14, pady=2)
+            label.pack(fill='x', padx=10, pady=1)
             self.prize_labels.append(label)
 
         self.main_frame = tk.Frame(self.canvas, bg=WIDGET_BG)
@@ -175,16 +187,34 @@ class GameClientGUI(tk.Toplevel):
         self.lifeline_frame.place(relx=0.5, rely=0.205, anchor=tk.CENTER)
 
         self.lifeline_buttons = {}
-        lifeline_texts = {"5050": "50:50", "audience": "Khán Giả", "call": "Gọi Điện", "wise_man": "Tư Vấn"}
-
-        for key, text in lifeline_texts.items():
-            btn = ColorButton(self.lifeline_frame, text=text, font=("Arial", 12, "bold"),
-                          fg="white", bg="#10265f", activebackground="#173783",
-                          activeforeground="white", disabledforeground="#61719d",
-                          relief=tk.FLAT, bd=0, padx=16, pady=8, state="disabled",
-                          command=lambda k=key: self.use_lifeline(k))
-            btn.pack(side=tk.LEFT, padx=7, pady=8)
+        for key in ("5050", "call", "audience", "wise_man"):
+            btn = ColorButton(
+                self.lifeline_frame,
+                image=self.lifeline_icon_images[(key, False)],
+                fg="white",
+                bg=WIDGET_BG,
+                activebackground=WIDGET_BG,
+                activeforeground="white",
+                disabledbackground=WIDGET_BG,
+                disabledforeground="#61719d",
+                relief=tk.FLAT,
+                bd=0,
+                padx=0,
+                pady=0,
+                state="disabled",
+                highlightthickness=0,
+                hover_enabled=True,
+                command=lambda k=key: self.use_lifeline(k),
+            )
+            btn.pack(side=tk.LEFT, padx=6, pady=4)
             self.lifeline_buttons[key] = btn
+
+        self.lifeline_timer_label = tk.Label(
+            self.main_frame,
+            bg=WIDGET_BG,
+            bd=0,
+            highlightthickness=0,
+        )
 
         self.option_buttons = {}
         self.option_positions = {}
@@ -280,6 +310,12 @@ class GameClientGUI(tk.Toplevel):
             GRADIENT_START,
             GRADIENT_END,
         )
+        self.game_background_pil = render_background_image(
+            self.background_source,
+            (main_width, game_height),
+            GRADIENT_START,
+            GRADIENT_END,
+        )
         self.game_background_label.config(image=self.game_background_image)
         self.game_background_label.lower()
 
@@ -291,8 +327,48 @@ class GameClientGUI(tk.Toplevel):
         )
         self.prize_background_label.config(image=self.prize_background_image)
         self.prize_background_label.lower()
+        self.refresh_game_element_assets()
+
+    def crop_game_background(self, relx, rely, item_width, item_height):
+        background = getattr(self, "game_background_pil", None)
+        if background is None:
+            return WIDGET_BG
+
+        bg_width, bg_height = background.size
+        left = int((bg_width * relx) - (item_width / 2))
+        top = int((bg_height * rely) - (item_height / 2))
+        src_box = (
+            max(0, left),
+            max(0, top),
+            min(bg_width, left + item_width),
+            min(bg_height, top + item_height),
+        )
+        crop = Image.new("RGBA", (item_width, item_height), WIDGET_BG)
+        if src_box[2] > src_box[0] and src_box[3] > src_box[1]:
+            crop.alpha_composite(
+                background.crop(src_box).convert("RGBA"),
+                (src_box[0] - left, src_box[1] - top),
+            )
+        return crop
+
+    def refresh_game_element_assets(self):
+        if not hasattr(self, "lbl_question"):
+            return
+
+        question_bg = self.crop_game_background(0.5, 0.2, 880, 135)
+        self.question_panel_image = load_lozenge_photo((880, 135), "normal", radius=18, background=question_bg)
+        self.lbl_question.config(image=self.question_panel_image)
+
+        self.option_button_images = {}
+        for option, pos in self.option_positions.items():
+            option_bg = self.crop_game_background(pos["relx"], pos["rely"], 470, 82)
+            self.option_button_images[option] = load_button_images((470, 82), background=option_bg)
+
+        for option in self.option_buttons:
+            self.style_answer_button(option, self.answer_visual_states.get(option, "normal"))
 
     def show_overlay(self, message, show_ready_btn=False, show_return_btn=False):
+        self.cancel_lifeline_timer()
         self.game_area.place_forget()
         self.lifeline_frame.place_forget()
         self.overlay_label.config(text=message)
@@ -323,6 +399,7 @@ class GameClientGUI(tk.Toplevel):
         for button in self.option_buttons.values():
             button.tkraise()
         self.lifeline_frame.tkraise()
+        self.lifeline_timer_label.tkraise()
         self.force_repaint()
 
     def force_repaint(self):
@@ -387,8 +464,10 @@ class GameClientGUI(tk.Toplevel):
     def style_answer_button(self, option, state, hover_enabled=None):
         if hover_enabled is None:
             hover_enabled = state == "normal"
+        self.answer_visual_states[option] = state
+        images = self.option_button_images.get(option, self.btn_images)
         self.option_buttons[option].config(
-            image=self.btn_images[state],
+            image=images.get(state, self.btn_images[state]),
             hover_enabled=hover_enabled,
         )
 
@@ -398,8 +477,12 @@ class GameClientGUI(tk.Toplevel):
         self.answer_buttons_locked = False
         self.current_level = data['level']
         self.current_lifelines_state = data['lifelines']
+        revealing_5050 = self.pending_lifeline_type == '5050' or data.get('lifeline_reveal') == '5050'
         if self.pending_lifeline_type == '5050':
-            self.finish_lifeline('5050', update_buttons=False)
+            self.pending_lifeline_job = None
+            self.pending_lifeline_type = None
+            self.cancel_lifeline_timer()
+            self.set_visible_answer_buttons_state("normal")
         self.lbl_question.config(text=f"CÂU {self.current_level} - {data['prize']} VNĐ\n{data['question']}")
 
         for option, btn in self.option_buttons.items():
@@ -415,17 +498,29 @@ class GameClientGUI(tk.Toplevel):
 
         self.update_lifeline_buttons()
         self.update_prize_display()
-        self.play_music_by_level()
+        if revealing_5050:
+            self.audio_manager.stop_all()
+            self.play_lifeline_intro('lifeline_5050')
+            self.lifeline_audio_job = self.after(2600, self.play_music_by_level)
+        else:
+            self.play_music_by_level()
         self.force_repaint()
         self.status_bar.config(text=f"Đang chờ thí sinh trả lời câu {self.current_level}...")
 
     def update_lifeline_buttons(self):
         for key, btn in self.lifeline_buttons.items():
-            is_available = self.current_lifelines_state.get(key, False)
+            raw_available = self.current_lifelines_state.get(key, False)
             if key == 'wise_man' and self.current_level < 6:
-                is_available = False
+                btn.config(state="disabled")
+                btn.pack_forget()
+                continue
+            if not btn.winfo_manager():
+                btn.pack(side=tk.LEFT, padx=6, pady=4)
+
+            is_available = raw_available
             if self.pending_lifeline_type:
                 is_available = False
+            btn.config(image=self.lifeline_icon_images[(key, not raw_available)])
             btn.config(state="normal" if is_available else "disabled")
 
     def update_prize_display(self):
@@ -434,13 +529,13 @@ class GameClientGUI(tk.Toplevel):
             is_milestone = prize_level in [5, 10, 15]
 
             if prize_level < self.current_level:
-                label.config(image=self.prize_row_images["dim"], bg="#050b23", fg=PASSED_PRIZE_COLOR)
+                label.config(image=self.prize_row_images["dim"], bg="#030615", fg=PASSED_PRIZE_COLOR)
             elif prize_level == self.current_level:
-                label.config(image=self.prize_row_images["selected"], bg="#050b23", fg="#050E21")
+                label.config(image=self.prize_row_images["selected"], bg="#030615", fg="#050E21")
             else:
                 color = MILESTONE_COLOR if is_milestone else DEFAULT_PRIZE_COLOR
                 image_key = "milestone" if is_milestone else "normal"
-                label.config(image=self.prize_row_images[image_key], bg="#050b23", fg=color)
+                label.config(image=self.prize_row_images[image_key], bg="#030615", fg=color)
 
     def play_music_by_level(self):
         if 1 <= self.current_level <= 5:
@@ -471,6 +566,7 @@ class GameClientGUI(tk.Toplevel):
                 btn.config(state="normal", hover_enabled=hover_enabled)
 
     def handle_lifeline_result(self, data):
+        self.cancel_lifeline_timer()
         lifeline_type = data.get('lifeline', 'unknown')
         if lifeline_type in self.current_lifelines_state:
             self.current_lifelines_state[lifeline_type] = False
@@ -657,6 +753,11 @@ class GameClientGUI(tk.Toplevel):
             self.update_question_display(data)
         elif msg_type == 'lifeline_result':
             self.handle_lifeline_result(data)
+        elif msg_type == 'lifeline_state':
+            self.current_lifelines_state = data.get('lifelines', self.current_lifelines_state)
+            self.update_lifeline_buttons()
+        elif msg_type == 'lifeline_timer':
+            self.start_lifeline_timer(data)
         elif msg_type == 'result':
             self.show_answer_result(data)
         elif msg_type == 'answer_unlocked':
@@ -699,20 +800,42 @@ class GameClientGUI(tk.Toplevel):
             messagebox.showerror("Server bận", data.get('message', 'Đã có thí sinh đang chơi.'))
             self.on_closing()
 
+    def start_lifeline_timer(self, data):
+        self.cancel_lifeline_timer()
+        self.lifeline_timer_remaining = int(data.get('seconds', 30) or 30)
+        sound_name = data.get('sound')
+        if sound_name and self.audio_manager.has_sound(sound_name):
+            self.audio_manager.stop_all()
+            self.audio_manager.play(sound_name, loop=False)
+        self.lifeline_timer_label.place(relx=0.72, rely=0.205, anchor=tk.CENTER, width=82, height=82)
+        self.lifeline_timer_label.tkraise()
+        self.update_lifeline_timer()
+
+    def update_lifeline_timer(self):
+        if self.lifeline_timer_remaining <= 0:
+            self.cancel_lifeline_timer()
+            return
+        self.lifeline_timer_image = load_timer_photo((78, 78), self.lifeline_timer_remaining)
+        self.lifeline_timer_label.config(image=self.lifeline_timer_image)
+        self.lifeline_timer_remaining -= 1
+        self.lifeline_timer_job = self.after(1000, self.update_lifeline_timer)
+
+    def cancel_lifeline_timer(self):
+        if self.lifeline_timer_job:
+            try:
+                self.after_cancel(self.lifeline_timer_job)
+            except tk.TclError:
+                pass
+            self.lifeline_timer_job = None
+        if hasattr(self, "lifeline_timer_label"):
+            self.lifeline_timer_label.place_forget()
+        self.lifeline_timer_remaining = 0
+        self.lifeline_timer_image = None
+
     def play_lifeline_audio(self, lifeline_type):
-        sound_by_type = {
-            '5050': 'lifeline_5050',
-            'audience': 'audience_countdown',
-            'call': 'lifeline_call',
-            'wise_man': 'lifeline_wise_man',
-        }
-        sound_name = sound_by_type.get(lifeline_type, 'lifeline')
-        self.audio_manager.stop_all()
         if self.audio_manager.has_sound('lifeline_click'):
+            self.audio_manager.stop_all()
             self.audio_manager.play('lifeline_click')
-            self.lifeline_audio_job = self.after(650, lambda: self.play_lifeline_intro(sound_name))
-        else:
-            self.play_lifeline_intro(sound_name)
 
     def play_lifeline_intro(self, sound_name):
         self.lifeline_audio_job = None
@@ -722,6 +845,7 @@ class GameClientGUI(tk.Toplevel):
             self.audio_manager.play('lifeline', loop=True)
 
     def cancel_pending_lifeline(self, update_buttons=True):
+        self.cancel_lifeline_timer()
         if self.pending_lifeline_job:
             try:
                 self.after_cancel(self.pending_lifeline_job)
@@ -741,6 +865,8 @@ class GameClientGUI(tk.Toplevel):
     def finish_lifeline(self, lifeline_type=None, update_buttons=True):
         self.pending_lifeline_job = None
         self.pending_lifeline_type = None
+        self.cancel_lifeline_timer()
+        self.audio_manager.stop_all()
         self.play_music_by_level()
         self.set_visible_answer_buttons_state("normal")
         if update_buttons:
@@ -765,9 +891,13 @@ class GameClientGUI(tk.Toplevel):
         self.current_lifelines_state[lifeline_type] = False
         self.set_visible_answer_buttons_state("disabled")
         self.update_lifeline_buttons()
-        delay_ms = 2000 if lifeline_type == 'audience' else 5000
-        delay_seconds = delay_ms // 1000
-        self.status_bar.config(text=f"Đã chọn trợ giúp. Đang chạy hiệu ứng {delay_seconds} giây trước khi mở kết quả...")
+        if lifeline_type in ['audience', 'call', 'wise_man']:
+            self.status_bar.config(text="Đã gửi yêu cầu trợ giúp. Chờ MC bắt đầu vòng 30 giây...")
+            self.send_lifeline_request(lifeline_type)
+            return
+
+        delay_ms = 5000
+        self.status_bar.config(text="Đã chọn trợ giúp. Đang chạy hiệu ứng 5 giây trước khi mở kết quả...")
         self.pending_lifeline_job = self.after(delay_ms, lambda: self.send_lifeline_request(lifeline_type))
 
     def enter_give_up_regret_mode(self, data):

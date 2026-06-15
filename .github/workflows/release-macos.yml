@@ -32,10 +32,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
+          release_flags=()
+          case "${GITHUB_REF_NAME}" in
+            *alpha*|*Alpha*|*ALPHA*|*beta*|*Beta*|*BETA*|*rc*|*RC*|*pre*|*Pre*|*PRE*)
+              release_flags+=(--prerelease)
+              ;;
+          esac
           gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
             gh release create "${GITHUB_REF_NAME}" \
               --title "Ai La Trieu Phu macOS ${GITHUB_REF_NAME}" \
-              --notes "macOS 14 unsigned installer selector and role-specific pkg builds for Apple Silicon (arm64) and Intel. Right-click and Open may be required on first launch."
+              --notes "macOS 14 unsigned installer selector and role-specific pkg builds for Apple Silicon (arm64) and Intel. Right-click and Open may be required on first launch." \
+              "${release_flags[@]}"
 
   build:
     name: macOS ${{ matrix.arch }} pkg
@@ -71,6 +78,7 @@ jobs:
           echo "MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET}"
           VERSION="${GITHUB_REF_NAME#macos_v}"
           if [ "$VERSION" = "$GITHUB_REF_NAME" ]; then VERSION="1.0.0"; fi
+          PKG_VERSION="${VERSION%%-*}"
           bash packaging/build_macos.sh "$TARGET" "$VERSION"
 
       - name: Pack macOS role pkgs and installer
@@ -105,7 +113,7 @@ jobs:
             pkgbuild \
               --root "$pkgroot" \
               --identifier "vn.duli.ailatrieuphu.${role}" \
-              --version "$VERSION" \
+              --version "$PKG_VERSION" \
               --install-location "/" \
               "$pkg"
             rm -rf "$pkgroot"
