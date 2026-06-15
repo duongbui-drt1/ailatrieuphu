@@ -1,4 +1,4 @@
-# Desktop builds
+﻿# Desktop builds
 
 The project ships three desktop apps:
 
@@ -90,22 +90,22 @@ Tags containing `alpha`, `beta`, `rc`, or `pre` are published as GitHub pre-rele
 For a Windows release:
 
 ```bash
-git tag windows_v2.0.0-beta.1
-git push origin windows_v2.0.0-beta.1
+git tag windows_v2.0.0-beta.2
+git push origin windows_v2.0.0-beta.2
 ```
 
 The Windows workflow uploads:
 
-- `AiLaTrieuPhu-Windows-Installer-windows_v2.0.0-beta.1.zip`
-- `AiLaTrieuPhu-Windows-host-windows_v2.0.0-beta.1.zip`
-- `AiLaTrieuPhu-Windows-client-windows_v2.0.0-beta.1.zip`
-- `AiLaTrieuPhu-Windows-viewer-windows_v2.0.0-beta.1.zip`
+- `AiLaTrieuPhu-Windows-Installer-windows_v2.0.0-beta.2.zip`
+- `AiLaTrieuPhu-Windows-host-windows_v2.0.0-beta.2.zip`
+- `AiLaTrieuPhu-Windows-client-windows_v2.0.0-beta.2.zip`
+- `AiLaTrieuPhu-Windows-viewer-windows_v2.0.0-beta.2.zip`
 
 For a macOS release:
 
 ```bash
-git tag macos_v2.0.0-beta.1
-git push origin macos_v2.0.0-beta.1
+git tag macos_v2.0.0-beta.2
+git push origin macos_v2.0.0-beta.2
 ```
 
 The macOS-only workflow uploads role-specific `.pkg` files and a small installer selector. Users can download the installer selector, choose Host/Người Chơi/Khán Giả, and fetch only the needed package.

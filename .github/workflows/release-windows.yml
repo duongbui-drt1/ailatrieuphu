@@ -113,15 +113,19 @@ jobs:
           }
 
           if (-not $ReleaseExists) {
-            $ReleaseArgs = @(
-              "release", "create", $Tag,
-              "--title", "Ai La Trieu Phu Windows $Tag",
-              "--notes", "Windows unsigned desktop installer and role-specific downloads."
-            )
             if ($Tag -match "(?i)(alpha|beta|rc|pre)") {
-              $ReleaseArgs += "--prerelease"
+              gh release create $Tag `
+                --title "Ai La Trieu Phu Windows $Tag" `
+                --notes "Windows unsigned desktop installer and role-specific downloads." `
+                --prerelease
+            } else {
+              gh release create $Tag `
+                --title "Ai La Trieu Phu Windows $Tag" `
+                --notes "Windows unsigned desktop installer and role-specific downloads."
             }
-            gh @ReleaseArgs
+            if ($LASTEXITCODE -ne 0) {
+              throw "GitHub release create failed for $Tag."
+            }
           }
 
           $RoleZipNames = @(

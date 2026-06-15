@@ -333,39 +333,48 @@ def build_macos_pkg(app_keys: list[str], version: str) -> None:
     if sys.platform != "darwin":
         raise SystemExit(".pkg can only be built on macOS. Build the Windows .exe on Windows.")
 
-    pkg_root = ROOT_DIR / "build" / "pkgroot"
-    applications_dir = pkg_root / "Applications"
-    if pkg_root.exists():
-        shutil.rmtree(pkg_root)
-    applications_dir.mkdir(parents=True, exist_ok=True)
-
-    for app_key in app_keys:
-        app_name = APPS[app_key]["name"]
-        display_name = app_display_name(app_key)
-        app_bundle = DIST_DIR / f"{app_name}.app"
-        if not app_bundle.exists():
-            raise SystemExit(f"Missing app bundle for pkg: {app_bundle}")
-        shutil.copytree(app_bundle, applications_dir / f"{display_name}.app")
-
     package_name = "AiLaTrieuPhu.pkg" if len(app_keys) > 1 else f"{APPS[app_keys[0]]['name']}.pkg"
     package_path = DIST_DIR / package_name
-    identifier_suffix = "suite" if len(app_keys) > 1 else app_keys[0]
+    pkg_version = macos_release_version(version)
 
-    subprocess.run(
-        [
-            "pkgbuild",
-            "--root",
-            str(pkg_root),
-            "--identifier",
-            f"{APP_IDENTIFIER_ROOT}.{identifier_suffix}",
-            "--version",
-            version,
-            "--install-location",
-            "/",
-            str(package_path),
-        ],
-        check=True,
-    )
+    with tempfile.TemporaryDirectory() as temp_dir_name:
+        temp_dir = Path(temp_dir_name)
+        component_pkgs = []
+        for app_key in app_keys:
+            app_name = APPS[app_key]["name"]
+            display_name = app_display_name(app_key)
+            app_bundle = DIST_DIR / f"{app_name}.app"
+            if not app_bundle.exists():
+                raise SystemExit(f"Missing app bundle for pkg: {app_bundle}")
+
+            component_app = temp_dir / f"{display_name}.app"
+            shutil.copytree(app_bundle, component_app)
+            component_pkg = temp_dir / f"{app_name}.pkg"
+            subprocess.run(
+                [
+                    "pkgbuild",
+                    "--component",
+                    str(component_app),
+                    "--install-location",
+                    "/Applications",
+                    "--identifier",
+                    f"{APP_IDENTIFIER_ROOT}.{app_key}",
+                    "--version",
+                    pkg_version,
+                    str(component_pkg),
+                ],
+                check=True,
+            )
+            component_pkgs.append(component_pkg)
+
+        if len(component_pkgs) == 1:
+            shutil.copy2(component_pkgs[0], package_path)
+        else:
+            product_args = ["productbuild"]
+            for component_pkg in component_pkgs:
+                product_args.extend(["--package", str(component_pkg)])
+            product_args.append(str(package_path))
+            subprocess.run(product_args, check=True)
     print(f"\n==> Built {package_path}")
 
 
