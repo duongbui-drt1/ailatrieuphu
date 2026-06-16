@@ -11,4 +11,4 @@ fi
 
 python3 -m pip install -r requirements.txt
 python3 -m pip install -r requirements-build.txt
-python3 packaging/build_apps.py --target "$TARGET" --pkg --version "$VERSION"
+python3 packaging/build_apps.py --target "$TARGET" --dmg --version "$VERSION"

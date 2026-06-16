@@ -378,16 +378,52 @@ def build_macos_pkg(app_keys: list[str], version: str) -> None:
     print(f"\n==> Built {package_path}")
 
 
+def build_macos_dmg(app_keys: list[str], version: str) -> None:
+    if sys.platform != "darwin":
+        raise SystemExit(".dmg can only be built on macOS. Build the Windows .exe on Windows.")
+
+    del version
+    for app_key in app_keys:
+        app_name = APPS[app_key]["name"]
+        display_name = app_display_name(app_key)
+        app_bundle = DIST_DIR / f"{app_name}.app"
+        if not app_bundle.exists():
+            raise SystemExit(f"Missing app bundle for dmg: {app_bundle}")
+
+        dmg_path = DIST_DIR / f"{app_name}.dmg"
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            shutil.copytree(app_bundle, temp_dir / f"{display_name}.app")
+            (temp_dir / "Applications").symlink_to("/Applications")
+            subprocess.run(
+                [
+                    "hdiutil",
+                    "create",
+                    "-volname",
+                    display_name,
+                    "-srcfolder",
+                    str(temp_dir),
+                    "-ov",
+                    "-format",
+                    "UDZO",
+                    str(dmg_path),
+                ],
+                check=True,
+            )
+        print(f"\n==> Built {dmg_path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build Ai La Trieu Phu desktop apps.")
     parser.add_argument("--target", choices=["all", *APPS.keys()], default="all")
     parser.add_argument("--onefile", action="store_true", help="Build one executable file per app.")
     parser.add_argument("--pkg", action="store_true", help="On macOS, also build a .pkg installer.")
+    parser.add_argument("--dmg", action="store_true", help="On macOS, also build drag-to-Applications .dmg files.")
     parser.add_argument("--version", default=APP_VERSION)
     args = parser.parse_args()
 
-    if args.pkg and args.onefile:
-        raise SystemExit("--pkg requires macOS .app bundles. Remove --onefile.")
+    if (args.pkg or args.dmg) and args.onefile:
+        raise SystemExit("--pkg/--dmg require macOS .app bundles. Remove --onefile.")
 
     app_keys = selected_apps(args.target)
     for app_key in app_keys:
@@ -395,6 +431,8 @@ def main() -> None:
 
     if args.pkg:
         build_macos_pkg(app_keys, args.version)
+    if args.dmg:
+        build_macos_dmg(app_keys, args.version)
 
     print(f"\nDone. Output: {DIST_DIR}")
 

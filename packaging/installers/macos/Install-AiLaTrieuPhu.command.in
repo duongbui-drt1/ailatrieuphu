@@ -12,7 +12,7 @@ else
 fi
 
 echo ""
-echo "Ai Là Triệu Phú - macOS Installer"
+echo "Ai Là Triệu Phú - macOS DMG Selector"
 echo "Release: $TAG"
 echo "Máy hiện tại: $RELEASE_ARCH"
 echo ""
@@ -42,16 +42,17 @@ case "$CHOICE" in
     ;;
 esac
 
-ASSET="AiLaTrieuPhu-macOS-${ROLE}-${RELEASE_ARCH}-macos14.pkg"
+ASSET="AiLaTrieuPhu-macOS-${ROLE}-${RELEASE_ARCH}-macos14.dmg"
 URL="https://github.com/${REPO}/releases/download/${TAG}/${ASSET}"
-TMP_PKG="${TMPDIR:-/tmp}/${ASSET}"
+TMP_DMG="${TMPDIR:-/tmp}/${ASSET}"
 
 echo ""
 echo "Đang tải ${DISPLAY}..."
 echo "$URL"
-curl -L --fail --progress-bar -o "$TMP_PKG" "$URL"
+curl -L --fail --progress-bar -o "$TMP_DMG" "$URL"
 
 echo ""
-echo "Đã tải: $TMP_PKG"
-echo "Đang mở macOS Installer..."
-open "$TMP_PKG"
+echo "Đã tải: $TMP_DMG"
+echo "Đang mở DMG..."
+echo "Kéo ${DISPLAY}.app vào biểu tượng Applications trong cửa sổ vừa mở."
+open "$TMP_DMG"

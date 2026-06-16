@@ -45,7 +45,7 @@ jobs:
           retention-days: 1
 
   macos:
-    name: macOS app and pkg
+    name: macOS app and dmg
     runs-on: macos-latest
     steps:
       - name: Checkout

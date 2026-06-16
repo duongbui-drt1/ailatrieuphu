@@ -16,7 +16,7 @@ Build outputs use stable ASCII technical names so GitHub Actions and Windows zip
 - `AiLaTrieuPhu-Client`
 - `AiLaTrieuPhu-Viewer`
 
-Installers and shortcuts still use the Vietnamese display names.
+Installers, DMGs, and shortcuts still use the Vietnamese display names.
 
 ## Windows .exe
 
@@ -61,7 +61,7 @@ $env:AILTP_PYTHON="C:\Path\To\python.exe"
 .\packaging\build_windows.bat
 ```
 
-## macOS .app and .pkg
+## macOS .app and .dmg
 
 Build this on a Mac:
 
@@ -77,40 +77,44 @@ bash packaging/build_macos.sh client
 bash packaging/build_macos.sh viewer
 ```
 
-The script creates `.app` bundles in `dist/` and an unsigned `.pkg` installer. The full-suite package installs all selected apps into `/Applications`.
+The script creates `.app` bundles in `dist/` and unsigned drag-to-Applications `.dmg` files. Open the DMG and drag the app onto the Applications shortcut.
 
 Unsigned macOS apps may require right-clicking and choosing Open the first time, or signing/notarization for public distribution.
 
 ## Create GitHub Releases
 
-Push an OS-specific tag. Each workflow builds only one operating system and uploads a thin installer plus role-specific packages.
+Push an OS-specific tag. Each workflow builds only one operating system and uploads a thin selector plus role-specific downloads.
 
 Tags containing `alpha`, `beta`, `rc`, or `pre` are published as GitHub pre-releases.
 
 For a Windows release:
 
 ```bash
-git tag windows_v2.0.0-beta.2
-git push origin windows_v2.0.0-beta.2
+git tag windows_v2.0.0-beta.3
+git push origin windows_v2.0.0-beta.3
 ```
 
 The Windows workflow uploads:
 
-- `AiLaTrieuPhu-Windows-Installer-windows_v2.0.0-beta.2.zip`
-- `AiLaTrieuPhu-Windows-host-windows_v2.0.0-beta.2.zip`
-- `AiLaTrieuPhu-Windows-client-windows_v2.0.0-beta.2.zip`
-- `AiLaTrieuPhu-Windows-viewer-windows_v2.0.0-beta.2.zip`
+- `AiLaTrieuPhu-Windows-Installer-windows_v2.0.0-beta.3.zip`
+- `AiLaTrieuPhu-Windows-host-windows_v2.0.0-beta.3.zip`
+- `AiLaTrieuPhu-Windows-client-windows_v2.0.0-beta.3.zip`
+- `AiLaTrieuPhu-Windows-viewer-windows_v2.0.0-beta.3.zip`
 
 For a macOS release:
 
 ```bash
-git tag macos_v2.0.0-beta.2
-git push origin macos_v2.0.0-beta.2
+git tag macos_v2.0.0-beta.3
+git push origin macos_v2.0.0-beta.3
 ```
 
-The macOS-only workflow uploads role-specific `.pkg` files and a small installer selector. Users can download the installer selector, choose Host/Người Chơi/Khán Giả, and fetch only the needed package.
+The macOS-only workflow uploads role-specific `.dmg` files and a small DMG selector. Users can download the selector, choose Host/Người Chơi/Khán Giả, fetch only the needed DMG, then drag the app to Applications.
 
-The macOS-only workflow targets macOS 14. It builds two packages:
+The selector asset is named:
+
+- `AiLaTrieuPhu-macOS-DMG-Selector-macos_v2.0.0-beta.3.zip`
+
+The macOS-only workflow targets macOS 14. It builds two DMG sets:
 
 - `arm64-macos14`: for Apple Silicon Macs.
 - `intel-macos14`: for Intel Macs.
@@ -124,5 +128,5 @@ If the helper scripts are not convenient:
 ```bash
 python packaging/build_apps.py --target all
 python packaging/build_apps.py --target host --onefile
-python packaging/build_apps.py --target all --pkg
+python packaging/build_apps.py --target all --dmg
 ```
